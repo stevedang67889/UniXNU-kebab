@@ -1,9 +1,0 @@
-# Modules of this device repository, resolved on top of UniXNU's own feeds.toml.
-#
-# One repository per hardware driver, pulled in as a submodule under drivers/
-# and declared here so "unixnu tree" links it where the build looks for it.
-
-[[source]]
-name = "KebabRamDisk"
-kind = "driver"      # UEFI driver, referenced from [firmware] packages as {tree}/drivers/KebabRamDisk
-local = "drivers/KebabRamDisk"
