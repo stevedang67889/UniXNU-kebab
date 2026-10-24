@@ -1,0 +1,606 @@
+{
+ "props": [
+  {
+   "k": "device-color-policy",
+   "t": "u32",
+   "v": 0
+  },
+  {
+   "k": "side-button-location",
+   "t": "data",
+   "v": "dfMAACoPAgAAcQAA6j8AAOgDAAA="
+  },
+  {
+   "k": "activation-protocol-version",
+   "t": "u32",
+   "v": 2
+  },
+  {
+   "k": "product-name",
+   "t": "str",
+   "v": "iPhone X"
+  },
+  {
+   "k": "compatible-device-fallback",
+   "t": "str",
+   "v": "iPhone9,2"
+  },
+  {
+   "k": "artwork-dynamic-displaymode",
+   "t": "str",
+   "v": "0"
+  },
+  {
+   "k": "volume-up-button-location",
+   "t": "data",
+   "v": "eLAJAP+WFAAw4AMAyp0BABAnAAA="
+  },
+  {
+   "k": "product-description",
+   "t": "str",
+   "v": "iPhone X"
+  },
+  {
+   "k": "thin-bezel",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "car-integration",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "compatible-app-variant",
+   "t": "str",
+   "v": "0"
+  },
+  {
+   "k": "ui-reachability",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "has-boot-chime",
+   "t": "u32",
+   "v": 0
+  },
+  {
+   "k": "bluetooth-le",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "iap2-protocol-supported",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "ui-weather-quality",
+   "t": "u32",
+   "v": 100
+  },
+  {
+   "k": "sandman-support",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "supports-burnin-mitigation",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "baseband-chipset",
+   "t": "str",
+   "v": "mav17"
+  },
+  {
+   "k": "ptp-large-files",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "location-reminders",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "volume-down-button-location",
+   "t": "data",
+   "v": "eLAJAP+WFABI0AUAyp0BABAnAAA="
+  },
+  {
+   "k": "mobiledevice-beta-min-ver",
+   "t": "str",
+   "v": "1190.100.2"
+  },
+  {
+   "k": "public-key-accelerator",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "graphics-featureset-class",
+   "t": "str",
+   "v": "APPLE4"
+  },
+  {
+   "k": "watch-companion",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "front-cam-offset-from-center",
+   "t": "data",
+   "v": "0AEBAJ4dAADoAwAAAAAAAA=="
+  },
+  {
+   "k": "builtin-mics",
+   "t": "u32",
+   "v": 4
+  },
+  {
+   "k": "ui-background-quality",
+   "t": "u32",
+   "v": 100
+  },
+  {
+   "k": "has-applelpm",
+   "t": "u32",
+   "v": 0
+  },
+  {
+   "k": "artwork-device-subtype",
+   "t": "u64",
+   "v": 2436
+  },
+  {
+   "k": "assistant",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "hearingaid-audio-equalization",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "low-power-wallet-mode",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "artwork-scale-factor",
+   "t": "u32",
+   "v": 3
+  },
+  {
+   "k": "ephemeral-data-mode",
+   "t": "u32",
+   "v": 0
+  },
+  {
+   "k": "display-mirroring",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "allow-32bit-apps",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "dictation",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "ui-pip",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "hearingaid-low-energy-audio",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "artwork-device-idiom",
+   "t": "str",
+   "v": "phone"
+  },
+  {
+   "k": "udid-version",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "offline-dictation",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "RF-exposure-separation-distance",
+   "t": "u32",
+   "v": 5
+  },
+  {
+   "k": "mobiledevice-min-ver",
+   "t": "str",
+   "v": "1400"
+  },
+  {
+   "k": "device-perf-memory-class",
+   "t": "u32",
+   "v": 4
+  },
+  {
+   "k": "siri-gesture",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "graphics-featureset-fallbacks",
+   "t": "str",
+   "v": "APPLE3:APPLE3v1:APPLE2:APPLE1:GLES2,0"
+  },
+  {
+   "k": "oled-display",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "personal-hotspot",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "single-stage-boot",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "lockdown-certtype",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "itunes-min-ver",
+   "t": "u64",
+   "v": 788227
+  },
+  {
+   "k": "artwork-display-gamut",
+   "t": "str",
+   "v": "P3"
+  },
+  {
+   "k": "wifi-chipset",
+   "t": "str",
+   "v": "4357"
+  },
+  {
+   "k": "gps-capable",
+   "t": "u32",
+   "v": 1
+  },
+  {
+   "k": "product-id",
+   "t": "data",
+   "v": "/QebKYFEp96018h/7z60dNjw5+s="
+  }
+ ],
+ "children": [
+  {
+   "name": "camera",
+   "props": [
+    {
+     "k": "rear-cam-telephoto-capability",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "panorama",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "rear-burst-image-duration",
+     "t": "u32",
+     "v": 100
+    },
+    {
+     "k": "aggregate-camera",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "front-auto-hdr",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "front-hdr",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "front-hdr-on",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "video-stills",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "live-effects",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "front-max-video-fps-1080p",
+     "t": "u32",
+     "v": 30
+    },
+    {
+     "k": "aggregate-cam-video-zoom",
+     "t": "u32",
+     "v": 600
+    },
+    {
+     "k": "video-cap",
+     "t": "u32",
+     "v": 2
+    },
+    {
+     "k": "rear-max-slomo-video-fps-720p",
+     "t": "u32",
+     "v": 240
+    },
+    {
+     "k": "post-effects",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "stage-light-portrait-preview",
+     "t": "u32",
+     "v": 0
+    },
+    {
+     "k": "front-max-video-fps-720p",
+     "t": "u32",
+     "v": 30
+    },
+    {
+     "k": "rear-max-burst-length",
+     "t": "u32",
+     "v": 600
+    },
+    {
+     "k": "auto-focus",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "front-burst-image-duration",
+     "t": "u32",
+     "v": 100
+    },
+    {
+     "k": "rear-max-video-fps-720p",
+     "t": "u32",
+     "v": 60
+    },
+    {
+     "k": "rear-max-slomo-video-fps-1080p",
+     "t": "u32",
+     "v": 240
+    },
+    {
+     "k": "front-flash-capability",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "pearl-camera",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "rear-auto-hdr",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "camera-hdr-version",
+     "t": "u32",
+     "v": 2
+    },
+    {
+     "k": "front-max-burst-length",
+     "t": "u32",
+     "v": 600
+    },
+    {
+     "k": "flash",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "p3-color-space-video-recording",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "rear-max-video-fps-1080p",
+     "t": "u32",
+     "v": 60
+    },
+    {
+     "k": "rear-hdr",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "front-max-video-zoom",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "rear-max-video-fps-4k",
+     "t": "u32",
+     "v": 60
+    },
+    {
+     "k": "rear-max-video-zoom",
+     "t": "u32",
+     "v": 3
+    },
+    {
+     "k": "pipelined-stillimage-capability",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "rear-burst",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "live-photo-capture",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "front-burst",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "rear-hdr-on",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "aggregate-cam-photo-zoom",
+     "t": "u64",
+     "v": 1000
+    },
+    {
+     "k": "rear-slowmo",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "rear-max-video-frame_rate",
+     "t": "u32",
+     "v": 60
+    }
+   ]
+  },
+  {
+   "name": "facetime",
+   "props": [
+    {
+     "k": "tnr-mode-back",
+     "t": "u32",
+     "v": 10
+    },
+    {
+     "k": "tnr-mode-front",
+     "t": "u32",
+     "v": 10
+    },
+    {
+     "k": "bitrate-2g",
+     "t": "u32",
+     "v": 100
+    },
+    {
+     "k": "pref-decoding",
+     "t": "u64",
+     "v": 216172910962803712
+    },
+    {
+     "k": "decoding",
+     "t": "data",
+     "v": "QAEAAA8A8ABAAQAAHgDwAOABAAAPAHAB4AEAAB4AcAGAAgAAHgDgAQAEAAAeAAAD"
+    },
+    {
+     "k": "bitrate-3g",
+     "t": "u32",
+     "v": 228
+    },
+    {
+     "k": "bitrate-lte",
+     "t": "u32",
+     "v": 228
+    },
+    {
+     "k": "bitrate-wifi",
+     "t": "u64",
+     "v": 2000
+    },
+    {
+     "k": "encoding",
+     "t": "data",
+     "v": "QAEAAA8A8ABAAQAAHgDwAOABAAAPAHAB4AEAAB4AcAGAAgAAHgDgAQAEAAAeAAADAAUAAB4A0AI="
+    }
+   ]
+  },
+  {
+   "name": "maps",
+   "props": [
+    {
+     "k": "navigation",
+     "t": "u32",
+     "v": 0
+    },
+    {
+     "k": "3d-imagery",
+     "t": "u32",
+     "v": 0
+    },
+    {
+     "k": "3d-maps",
+     "t": "u32",
+     "v": 0
+    }
+   ]
+  },
+  {
+   "name": "haptics",
+   "props": [
+    {
+     "k": "closed-loop",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "supports-3rd-party-haptics",
+     "t": "u32",
+     "v": 1
+    }
+   ]
+  },
+  {
+   "name": "audio",
+   "props": [
+    {
+     "k": "wireless-splitter",
+     "t": "u32",
+     "v": 1
+    },
+    {
+     "k": "supports-always-listening",
+     "t": "u32",
+     "v": 1
+    }
+   ]
+  }
+ ]
+}
