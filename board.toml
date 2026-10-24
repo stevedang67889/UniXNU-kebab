@@ -33,8 +33,8 @@ fetch = ["KernelCache", "DeviceTree", "StaticTrustCache", "Cryptex1,SystemTrustC
 # first_lba still needs a GPT read (root shell or the UEFI block device):
 # the values below came from another unit and do NOT match this one.
 [userdata]
-first_lba = 0          # TODO(measure): sgdisk -p /dev/block/sda
-last_lba = 57005018    # first_lba + 57,005,019 - 1
+first_lba = 4748320    # GPT of the KB2000 9008 package (gpt_main0.bin)
+last_lba = 61748338    # first + 57,005,019 - 1 (measured partition size)
 lba_bytes = 4096
 windows = [
   { name = "OS", component = "OS" },
