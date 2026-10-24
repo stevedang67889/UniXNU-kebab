@@ -2,10 +2,11 @@
 
 UniXNU device repository for the **OnePlus 8T (kebab, Qualcomm SM8250)**.
 
-Status: **bring-up, kernel first**. The UEFI side is not usable yet on this phone
-(see "Blocker" below), so this repository currently targets the `kernel` step of
-the macOS workflow: produce `out/kebab/kernel/kernel.macho` from the pinned donor
-IPSW.
+Status: **UEFI bring-up done on hardware (2026-10-24)**. Mu-Silicium boots on a
+KB2000 (12+256, ColorOS 14, unlocked): the UniXNU boot menu is displayed, the
+power and volume keys work, and the firmware log is readable on the panel. UFS
+block storage is the remaining blocker; the kernel, ADT and payload volume are
+built and waiting for it.
 
 ## Layout
 
@@ -15,18 +16,8 @@ IPSW.
 | `configs/kebab_defconfig` | minimal kernel configuration (DT platform, no device drivers yet) |
 | `scripts/` | archive builders and the kebab ADT generator |
 | `package/unixnu.toml` | UniXNU boot menu configuration for the device kit |
+| `docs/bring-up.md` | what was measured on hardware and what it took to boot |
 | `unixnu.lock` | pinned source commits written by `unixnu fetch` |
-
-## Local changes against the previous WIP state
-
-* `package/` was pruned: the 92 sheng (SM8550) Adreno/Metal probe files were not
-  applicable to this SoC and broke the firmware build. They are kept out of the
-  tree; only `package/unixnu.toml` remains.
-* `[board] kit` is `kebab` (was `sheng`).
-* `[firmware] packages` includes `{tree}/package` so EDK II can resolve
-  `UniXNUPkg`; `defines` supplies `ENABLE_SECUREBOOT=0` / `DEVICE_MODEL=0`.
-* `package/unixnu.toml` no longer points at a non-existent
-  `Payloads/ShengPreflight.efi`.
 
 ## Build (macOS or the GitHub macOS runner)
 
@@ -49,41 +40,49 @@ workflow with:
 | `steps` | `kernel` |
 | `xcode` | default |
 
-## Blocker: the UEFI firmware does not start on this phone
+## Boot image recipe (what actually boots)
 
-Measured on a KB2000 (12+256, ColorOS 14, unlocked) on 2026-10-24:
+The firmware volume is built from Mu-Silicium and packed into an Android boot
+image. Two details decide whether the phone shows anything:
 
-* `fastboot boot` of any unsigned image fails with
-  `Failed to load/authenticate boot image: Load Error`; a signed LineageOS
-  recovery boots, so flashing works but ABL authenticates RAM-boot images.
-* Flashing `Mu-Silicium`'s own `Mu-kebab.img` (and our repacked variants:
-  header v1/2048, v2/4096, gzip, raw, with/without AVB footer) to `boot_a`
-  always ends back in fastboot after ~8 s, with a black screen.
-* A 72-byte `wfi` stub flashed to `boot_a` keeps the phone off fastboot for
-  ~6 s, so ABL *does* execute our images; the firmware itself then dies.
-* A red-fill marker at the start of `SiliciumPkg/Sec/Sec.c` is never visible,
-  and a spin at the same place still resets at ~8 s, so the SEC entry looks
-  unreachable (or the display path is dead in a way that also kills the
-  framebuffer debug output).
+1. **The DTB must be the phone's own live DTB.** `Mu-Silicium`'s
+   `Resources/DTBs/kebab.dtb` has no `cont_splash_region@9c000000`, so ABL logs
+   `ERROR: Could not get splash memory region node` and never hands the
+   framebuffer to the firmware: the screen stays on the stock boot logo. Dump
+   the live tree (`adb pull` of the running device tree) and pass that file as
+   `--dtb`.
+2. **Header v2 / 4096-byte pages**, kernel = BootShim + `SILICIUM_UEFI.fd`,
+   `--kernel_offset 0x8000 --tags_offset 0x100 --dtb_offset 0x1f00000`.
 
-`Mu-Silicium` has no public release image for kebab and marks the device
-`Inactive`, so this port appears to have never been validated on hardware.
-A UART console (QUPv3 SE2 at `0x00988000`, `qcom,msi-geni-console`, 115200 8N1)
-is the next debugging step; the firmware does not route `DEBUG()` there by
-default.
+`fastboot boot` is rejected by ABL (`Failed to load/authenticate boot image`);
+flash to `boot_a` instead and reboot.
 
 ## Device values
 
 | Item | Value | Source |
 | --- | --- | --- |
-| SoC | SM8250 (SD865) | stock DTB |
-| Debug UART | `0x00988000`, 115200 8N1 | stock DTB `/chosen/stdout-path` |
-| Framebuffer / splash | `0x9C000000`, `0x2300000` | mainline kebab DTS |
-| Panel | 1080 × 2400, stride 4320, a8r8g8b8 | mainline kebab DTS |
+| SoC | SM8250 (SD865) | live DTB |
+| Debug UART | **`0xA90000`** (QUPv3 SE12, GPIO34/35, 115200 8N1) | live DTB `earlycon=msm_geni_serial,0xa90000` |
+| Second console node | `0x00988000` is `status = "disabled"` | live DTB |
+| Framebuffer / splash | `0x9C000000`, `0x2300000`, 1080 × 2400 | live DTB `cont_splash_region@9c000000` |
+| Panel | `oplus20828samsung_amb655x_1080_2400_cmd` (Samsung AMB655X, command mode) | live DTB |
+| Touch | Synaptics S3908, i2c `a94000` addr `0x4B`, IRQ GPIO39, reset GPIO38 | live DTB |
 | Volume keys | PM8150 GPIO7 (down) / GPIO6 (up) | mainline kebab DTS |
 | UEFI FD | base `0x9FC00000`, size `0x300000` | Mu-Silicium `kebab.toml` |
 | `userdata` size | 233,492,557,824 bytes (57,005,019 × 4096) | `fastboot getvar partition-size:userdata` on the 12+256 unit |
-| `userdata` first LBA | **TODO: needs GPT read (root or UEFI)** | — |
+| `userdata` first LBA | 4,748,320 (GPT of the KB2000 9008 package) | `gpt_main0.bin` |
+
+## Remaining work
+
+* **UFS**: the vendor `UFSDxe` asserts with `Device Error` at `UFS.c:1004`.
+  Setting `EnableUfsIOC = 1` (as `alioth` does) removes the assert, but no block
+  device is produced yet, so UniXNU still falls back to its built-in menu.
+  The diagnostic driver `FsProbe` (see `docs/bring-up.md`) reports
+  *0 block devices, 0 file systems*.
+* **Payload volume**: UniXNU scans every `SimpleFileSystem` handle for
+  `\EFI\UniXNU\unixnu.toml`. Until UFS exposes a volume, the config embedded in
+  the firmware (`Config.c` fallback) is what the menu shows.
+* **Display / touch drivers** for the kernel, and the `userdata` image flash.
 
 ## License
 

@@ -133,8 +133,19 @@ kernel_args = [
   "debug=0x14e",
 ]
 
-# OnePlus ABL on kebab: try header v2 / 4096-byte pages (stock layout) if v1/2048
-# leaves the phone sitting in the bootloader after "fastboot boot".
+# OnePlus ABL on kebab: header v2 / 4096-byte pages, measured working on the
+# KB2000 unit. "fastboot boot" is rejected by ABL for any unsigned image, so the
+# boot image is flashed to boot_a.
+#
+# The dtb passed to mkbootimg MUST be the phone's own live device tree: the one
+# shipped in Mu-Silicium (Resources/DTBs/kebab.dtb) has no
+# cont_splash_region@9c000000 and ABL then refuses to hand the framebuffer over
+# ("Could not get splash memory region node" in abl_log), which shows up as a
+# black screen. See docs/bring-up.md.
 [bootimg.image]
 header_version = 2
 pagesize = 4096
+dtb = "live"          # dump from the device, never Resources/DTBs/kebab.dtb
+kernel_offset = 0x8000
+tags_offset = 0x100
+dtb_offset = 0x1f00000
