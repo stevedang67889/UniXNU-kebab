@@ -17,6 +17,7 @@ built and waiting for it.
 | `scripts/` | archive builders and the kebab ADT generator |
 | `package/unixnu.toml` | UniXNU boot menu configuration for the device kit |
 | `docs/bring-up.md` | what was measured on hardware and what it took to boot |
+| `drivers/KebabRamDisk` | submodule: UEFI driver that exposes the firmware-embedded payload as a RAM disk |
 | `unixnu.lock` | pinned source commits written by `unixnu fetch` |
 
 ## Build (macOS or the GitHub macOS runner)

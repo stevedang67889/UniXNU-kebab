@@ -94,6 +94,7 @@ packages = [
   "{uefi}/Silicium-ACPI/Platforms/OnePlus",
   "{uefi}/Silicium-ACPI/Silicon/Qualcomm",
   "{tree}/package",
+  "{tree}/drivers/KebabRamDisk",
 ]
 # Mu-Silicium expects these on the command line (its own build_uefi.py passes them).
 defines = { ENABLE_SECUREBOOT = 0, DEVICE_MODEL = 0 }
