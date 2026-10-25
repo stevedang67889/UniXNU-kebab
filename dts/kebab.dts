@@ -3036,6 +3036,7 @@
 		};
 
 		interrupt-controller@17a00000 {
+			unixnu,adt-name = "intc";
 			compatible = "arm,gic-v3";
 			#interrupt-cells = <0x03>;
 			interrupt-controller;

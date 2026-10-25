@@ -248,3 +248,30 @@ Measured chain with the current image:
 
 So the kernel reaches `_machine_startup` and stops inside it, at or before
 `_machine_conf` returns.
+## The ADT only exports nodes marked `unixnu,adt-name`
+
+`arm-io` stayed empty because the ADT generator exports **only** device tree nodes
+carrying a `unixnu,adt-name` property; every other node is dropped. The working
+umi port needs exactly one child there: the interrupt controller.
+
+```dts
+interrupt-controller@17a00000 {
+    unixnu,adt-name = "intc";
+    compatible = "arm,gic-v3";
+    ...
+};
+```
+
+The generated ADT then carries:
+
+```
+arm-io  ranges = base 0x17000000 size 0x1000000
+  intc  compatible = "arm,gic-v3"
+        reg = 0xa0000 + 0x10000 (distributor) and 0xa60000 + 0x100000 (redistributor)
+        redistributor-stride = 0x20000
+        #interrupt-cells = 3
+```
+
+Registers are emitted as offsets from the `arm-io` window, so `0xa0000` resolves
+to the GIC distributor at `0x17a00000` and `0xa60000` to the redistributor at
+`0x17a60000`. Add `unixnu,adt-name` to any further node the kernel has to see.
