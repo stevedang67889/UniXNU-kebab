@@ -143,7 +143,6 @@ kernel_args = [
 [bootimg.image]
 header_version = 2
 pagesize = 4096
-dtb = "live"
 kernel_offset = 0x8000
 tags_offset = 0x100
 dtb_offset = 0x1f00000
