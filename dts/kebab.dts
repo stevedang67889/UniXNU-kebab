@@ -14,7 +14,9 @@
 	memory {
 		ddr_device_type = <0x07>;
 		device_type = "memory";
-		reg = <0x00 0x80000000 0x00 0x39900000 0x02 0x00 0x02 0x00 0x00 0xc0000000 0x00 0xc0000000>;
+		// The ADT handoff wants one contiguous range; 12 GiB at 0x80000000 is what
+		// the loader is told. The real LPDDR map is discontiguous (see the boot log).
+		reg = <0x00 0x80000000 0x03 0x00000000>;
 	};
 
 	mem-offline {
@@ -39,6 +41,7 @@
 	};
 
 	cpus {
+		timebase-frequency = <0x124f800>;   // 19.2 MHz
 		#address-cells = <0x02>;
 		#size-cells = <0x00>;
 
