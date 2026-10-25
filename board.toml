@@ -1,18 +1,23 @@
-# Board description of the OnePlus 8T (kebab, SM8250), read by the unixnu build driver.
-#
-# First milestone: get `unixnu build kernel` to produce kernel.macho for kebab.
-# The [firmware] and [payload] sections are present but not yet validated; the
-# firmware we actually flash is built from our own Mu-Silicium tree.
+schema_version = 2
+
+# Board description of the OnePlus 8T (kebab, SM8250), read by the unixnu build
+# driver. Format 2: SoC resources come from UniXNU-sm8250-common, the OS profile
+# from the UniXNU base profiles, and this file keeps the board wiring.
 
 [board]
 name = "kebab"
 soc = "SM8250"
+soc_source = "sm8250"
+os_profile = "ipados-17.7.11-21H461"
 description = "OnePlus 8T"
-kit = "kebab"        # device kit name; package/ is mapped there
+kit = "kebab"        # device package/ appears as kits/kebab
 
-# Donor IPSW: identical to the sheng port.  The kernel is built from Apple's XNU
-# source and prelinked against this kernelcache, so the donor only has to match
-# the XNU version and prelink ABI - it is not a device we emulate.
+[components]
+include = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "XnuPrelink", "DarwinBoot"]
+
+# Donor IPSW: the kernel is built from Apple's XNU source and prelinked against
+# this kernelcache, so the donor only has to match the XNU version and prelink
+# ABI - it is not a device we emulate.
 [ipsw]
 url = "https://updates.cdn-apple.com/2025SpringFCS/fullrestores/122-77166/DCA6CFE8-90E9-4B92-880D-3DE171798E40/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw"
 product = "iPad7,1"
@@ -30,8 +35,6 @@ fetch = ["KernelCache", "DeviceTree", "StaticTrustCache", "Cryptex1,SystemTrustC
 # GPT entry "userdata" on LU0. The 12+256 KB2000 unit reports
 #   partition-size:userdata = 0x365D3DB000 = 233,492,557,824 bytes
 #   => 57,005,019 logical blocks of 4096 bytes.
-# first_lba still needs a GPT read (root shell or the UEFI block device):
-# the values below came from another unit and do NOT match this one.
 [userdata]
 first_lba = 4748320    # GPT of the KB2000 9008 package (gpt_main0.bin)
 last_lba = 61748338    # first + 57,005,019 - 1 (measured partition size)
@@ -43,6 +46,8 @@ windows = [
 
 [kernel]
 defconfig = "kebab_defconfig"
+config_fragments = ["soc:configs/sm8250.config"]
+patch_series = ["soc:patches/xnu/series"]
 archives = [
   "build-corecrypto-14.py",
   "build-corecrypto-14.py --namespace",
@@ -52,8 +57,8 @@ archives = [
   "build-kebab-stubs.py",
 ]
 
-# Values below match the donor kernelcache pinned above, so they are carried
-# over from the sheng port unchanged.  Re-check them if the IPSW ever changes.
+# Values below match the donor kernelcache pinned above; re-check them if the
+# IPSW ever changes.
 [kernel.prelink]
 tool = "kits/NativePrelink/emit_prelink.py"
 kernel = "build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped.noctf"
@@ -76,8 +81,13 @@ roots = [
   "com.apple.security.AppleImage4",
 ]
 
-# Firmware built from our own Mu-Silicium tree (used by `unixnu build firmware`
-# and by the boot image step; not needed for `unixnu build kernel`).
+# Board device tree. dts/kebab.dts is the tree this unit runs: it keeps the
+# splash reservation ABL needs and the controller nodes the firmware relies on.
+[device_tree]
+source = "device:dts/kebab.dts"
+include_dirs = ["soc:dts"]
+
+# Firmware built from our Mu-Silicium tree.
 [firmware]
 config = "kebab"
 dsc = "Platforms/OnePlus/kebabPkg/kebab.dsc"
@@ -94,9 +104,8 @@ packages = [
   "{uefi}/Silicium-ACPI/Platforms/OnePlus",
   "{uefi}/Silicium-ACPI/Silicon/Qualcomm",
   "{tree}/package",
-  "{tree}/drivers/KebabRamDisk",
+  "{tree}/drivers",
 ]
-# Mu-Silicium expects these on the command line (its own build_uefi.py passes them).
 defines = { ENABLE_SECUREBOOT = 0, DEVICE_MODEL = 0 }
 
 # Apple device tree for the kebab board. The hardware values come from this
@@ -105,13 +114,10 @@ defines = { ENABLE_SECUREBOOT = 0, DEVICE_MODEL = 0 }
 [payload.adt]
 tool = "scripts/make-kebab-adt.py"
 cpu_regs = "0,0x100,0x200,0x300,0x400,0x500,0x600,0x700"
-ipad_identity = false            # iPad-class identity (tablet idiom)
-iphone_identity = true          # iPhone X identity: phone idiom, iPhone10,3 / D22AP.
-                                 # Only /product, /buttons and the root model change;
-                                 # the hardware nodes stay SM8250-specific.
-                                 # The donor kernelcache is still the iPad7,1 ABI.
+ipad_identity = false
+iphone_identity = true
 chip_id = "0x8250"
-unique_chip_id = "required"      # supplied at build time, never stored here
+unique_chip_id = "required"
 
 # The payload volume DarwinBoot reads: the kernel, its device tree and the
 # optional trust cache and Data seed. The loader is part of the firmware volume.
@@ -120,33 +126,24 @@ volume = "KEBABESP"
 size_mib = 64
 loader = "firmware"
 title = "kebab first boot: source 4K XNU to console"
-# This unit is the 12 GiB SKU (owner-confirmed). The firmware still prints its
-# own measurement as "[XNU-HW] dram_size=..." so the value can be cross-checked
-# against the physical map on the next boot.
 dram_size = "0x300000000"
-panic_screen = false           # needs Font.h from the UEFI tree; enabled later
-# Terminal PSCI reset at the first instruction of this kernel function: tells
-# us whether execution reaches high-VA arm_init at all, with no console.
-# reset_at = "_arm_init"  # the console marks instead
+panic_screen = false
 kernel_args = [
   "-v",
   "serial=3",
   "debug=0x14e",
 ]
 
-# OnePlus ABL on kebab: header v2 / 4096-byte pages, measured working on the
-# KB2000 unit. "fastboot boot" is rejected by ABL for any unsigned image, so the
-# boot image is flashed to boot_a.
+# OnePlus ABL on kebab: header v2 / 4096-byte pages. "fastboot boot" is refused by
+# ABL for unsigned images, so the image is flashed to boot_a.
 #
 # The dtb passed to mkbootimg MUST be the phone's own live device tree: the one
-# shipped in Mu-Silicium (Resources/DTBs/kebab.dtb) has no
-# cont_splash_region@9c000000 and ABL then refuses to hand the framebuffer over
-# ("Could not get splash memory region node" in abl_log), which shows up as a
-# black screen. See docs/bring-up.md.
+# shipped in Mu-Silicium has no cont_splash_region@9c000000 and ABL then refuses
+# to hand the framebuffer over, which shows up as a black screen.
 [bootimg.image]
 header_version = 2
 pagesize = 4096
-dtb = "live"          # dump from the device, never Resources/DTBs/kebab.dtb
+dtb = "live"
 kernel_offset = 0x8000
 tags_offset = 0x100
 dtb_offset = 0x1f00000
