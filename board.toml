@@ -113,6 +113,7 @@ defines = { ENABLE_SECUREBOOT = 0, DEVICE_MODEL = 0 }
 # device's own firmware: MADT (GICv3 0x17A00000 / 0x17A60000), MemoryMapLib
 # (DRAM base 0x80000000), and the UFS host controller measured at 0x01D84000.
 [payload.adt]
+owned_memory_size = "0xC0000000"   # DarwinBoot window: 256 MiB is too small for arm_vm_init
 tool = "scripts/make-kebab-adt.py"
 cpu_regs = "0,0x100,0x200,0x300,0x400,0x500,0x600,0x700"
 ipad_identity = false
@@ -127,12 +128,17 @@ volume = "KEBABESP"
 size_mib = 64
 loader = "firmware"
 title = "kebab first boot: source 4K XNU to console"
-dram_size = "0x39900000"   # first contiguous DRAM chunk; the full map is discontiguous
-panic_screen = false     # true installs the entry probe and the panic screen
+dram_size = "0xC0000000"   # one 3 GiB DRAM window at 0xC0000000
+panic_screen = false
+# Entry probe (uncomment to bisect the kernel): a reboot N seconds after the
+# stage bars means the probe point was reached.
+# entry_probe_reset_delay = 6
+# entry_probe_reset_after = "_machine_conf"
+# entry_probe_reset_in = "_machine_startup"
 kernel_args = [
   "-v",
-  "serial=3",
-  "debug=0x14e",
+  "keepsyms=1",
+  "kt_fixed_zones=120",
 ]
 
 # OnePlus ABL on kebab: header v2 / 4096-byte pages. "fastboot boot" is refused by
@@ -147,3 +153,10 @@ pagesize = 4096
 kernel_offset = 0x8000
 tags_offset = 0x100
 dtb_offset = 0x1f00000
+
+[adt.chosen.u32]
+display-scale = 2
+display-rotation = 0
+
+[adt.defaults.u32]
+sleep-disabled = 1

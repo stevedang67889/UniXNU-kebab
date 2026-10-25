@@ -16,7 +16,7 @@
 		device_type = "memory";
 		// The ADT handoff wants one contiguous range; 12 GiB at 0x80000000 is what
 		// the loader is told. The real LPDDR map is discontiguous (see the boot log).
-		reg = <0x00 0x80000000 0x00 0x39900000>;
+		reg = <0x00 0xC0000000 0x00 0xC0000000>;
 	};
 
 	mem-offline {

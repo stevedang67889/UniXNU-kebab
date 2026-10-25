@@ -222,3 +222,29 @@ no uart, pmgr or interrupt-controller children — which is the next thing to fi
 - DarwinBoot: the kernel window moves to DRAM (>= 0x40000000) and the request is
   3 GiB so `arm_vm_init`'s early I/O page tables fit
 - ADT: `dram-base`, `dram-size` and `darwinboot-memory-size` all `0xC0000000`
+## Kernel progress probes
+
+`board.toml` can install a reset probe in the kernel instead of a screen bar:
+
+```toml
+entry_probe_reset_delay = 6
+entry_probe_reset_after = "_machine_conf"    # symbol that must return
+entry_probe_reset_in = "_machine_startup"    # function that calls it
+```
+
+The patched kernel waits six seconds after that call returns and resets with
+PSCI SYSTEM_RESET. A reboot therefore means the probe point was reached; a still
+screen means the hang is at or before it. Combined with the stage bars (blue at
+entry, magenta before the MMU is on) this is the only signal available before
+XNU has a console.
+
+Measured chain with the current image:
+
+| Probe | Result |
+| --- | --- |
+| stage 3 (just after the MMU enable) | reboot |
+| after `_machine_startup` in `_arm_init` | still |
+| after `_machine_conf` in `_machine_startup` | still |
+
+So the kernel reaches `_machine_startup` and stops inside it, at or before
+`_machine_conf` returns.
