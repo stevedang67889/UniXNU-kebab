@@ -40,3 +40,20 @@ not part of any UniXNU repository:
 `Platforms/OnePlus/kebabPkg/Driver/KebabRamDisk/` is untracked in Mu-Silicium and
 lives in the [KebabRamDisk](https://github.com/stevedang67889/KebabRamDisk)
 repository instead.
+## `mu-basecore-kebab.patch`
+
+Applies to the `Mu_Basecore` submodule of Mu-Silicium. The bring-up keeps the
+GIC spurious-interrupt mask, the generic-timer lib adjustments, the USB bus
+header change and the DxeCore notify guard that lets `ExitBootServices` finish.
+The decisive hunk is in `MdeModulePkg/Core/Dxe/Event/Event.c`:
+
+```c
+#define SKIP_INDEX   0xFFFF
+#define SKIP_ALL     1
+...
+if (!SKIP_ALL && (Index != SKIP_INDEX)) {
+  CoreNotifyEvent (Event);
+}
+```
+
+Set `SKIP_ALL` to 0 to notify normally and bisect by index with `SKIP_INDEX`.

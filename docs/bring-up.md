@@ -169,3 +169,56 @@ faulting later. `ExitBootServices` is retried 16 times with each result logged.
 `dram_size` and the `/memory` node in `dts/kebab.dts` are both restricted to the
 first contiguous DRAM chunk (`0x80000000`, `0x39900000` bytes). The real map is
 three discontiguous ranges and the ADT generator only accepts one.
+## 2026-10-25 (evening): the kernel runs — ExitBootServices was the wall
+
+The kernel had never executed. `DarwinEnter` never ran, so every kernel-side
+probe (stage bars, panic screen, timed resets) was inert. The wall was
+`ExitBootServices`.
+
+### Finding
+
+`CoreExitBootServices` notified 17 exit-boot-services callbacks and then never
+returned. A frame buffer marker placed immediately after the notification and
+before the memory-protection teardown never appeared, and a marker drawn after
+`gBS->ExitBootServices` returned never appeared either, so the hang was inside
+the notification phase.
+
+Skipping the callbacks one index at a time did not help; skipping **all** of them
+did. With `SKIP_ALL` in `CoreNotifySignalList` the sequence completes:
+
+```
+ExitBootServices ✅ → DarwinEnter (green band) ✅ → XNU entry (blue bar) ✅
+→ MMU enabled ✅ (proved by the 6 s timed reset) → _machine_startup ✅
+→ _machine_conf ⏳ hangs here
+```
+
+The boards that already boot (umi, lemonades, 13T) do not need this, so one of
+the 17 callbacks is specific to this firmware build. XNU does not need them:
+capsule locking, console teardown and the like are boot-service concerns.
+
+### Bisect results (each with a build and a flash)
+
+| Probe | Result |
+| --- | --- |
+| 17 EBS callbacks, unchanged | hang, no marker after the notifications |
+| skip callback 17 of 17 | hang |
+| `CapsuleRuntimeDxe` EBS handler returns immediately | hang |
+| remove `RamDiskDxe` | hang |
+| remove the whole USB stack (9 drivers) | hang |
+| remove `SimpleTextInOutSerial` | hang |
+| GIC spurious-interrupt mask patch | hang |
+| **skip all 17 callbacks** | **passes** |
+
+### Where it stops now
+
+`_machine_conf` in `_machine_startup` hangs. That function builds the platform
+expert, which walks the ADT. Our generated ADT has an **empty `arm-io` node** —
+no uart, pmgr or interrupt-controller children — which is the next thing to fix.
+
+### Firmware changes that made the kernel reachable
+
+- `CoreNotifySignalList`: `SKIP_ALL` guard (see `docs/patches/mu-basecore-kebab.patch`)
+- `DarwinEnter`: the green bar is cleaned out of the data cache before the branch
+- DarwinBoot: the kernel window moves to DRAM (>= 0x40000000) and the request is
+  3 GiB so `arm_vm_init`'s early I/O page tables fit
+- ADT: `dram-base`, `dram-size` and `darwinboot-memory-size` all `0xC0000000`

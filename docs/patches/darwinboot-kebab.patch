@@ -1,8 +1,19 @@
 diff --git a/DarwinBootPkg/Driver/DarwinBoot.c b/DarwinBootPkg/Driver/DarwinBoot.c
-index e2c5d91..d71cf21 100644
+index e2c5d91..82b6e23 100644
 --- a/DarwinBootPkg/Driver/DarwinBoot.c
 +++ b/DarwinBootPkg/Driver/DarwinBoot.c
-@@ -422,9 +422,30 @@ AllocateWindow (KERNEL *Kernel, UINT64 WindowSize, EFI_PHYSICAL_ADDRESS *Address
+@@ -12,6 +12,10 @@
+ #include <Protocol/LoadedImage.h>
+ #include <Protocol/GraphicsOutput.h>
+ #include <Protocol/SimpleFileSystem.h>
++#include <Protocol/DevicePath.h>
++#include <Library/DevicePathLib.h>
++#include <Protocol/ComponentName.h>
++#include <Protocol/ComponentName2.h>
+ #include "BootArgs.h"
+ #include "BootVideo.h"
+ #include "PackedRamdisk.h"
+@@ -422,9 +426,30 @@ AllocateWindow (KERNEL *Kernel, UINT64 WindowSize, EFI_PHYSICAL_ADDRESS *Address
    Status = GetMap (&Map, &Capacity, &Size, &Key, &Stride);
    if (EFI_ERROR (Status)) { if (Map != NULL) { FreePool (Map); } return Status; }
    Status = EFI_OUT_OF_RESOURCES;
@@ -33,7 +44,90 @@ index e2c5d91..d71cf21 100644
      End = RunEnd (Map, Size, Stride, Descriptor->PhysicalStart,
                    Descriptor->PhysicalStart + EFI_PAGES_TO_SIZE (Descriptor->NumberOfPages));
      RunBytes = End - Descriptor->PhysicalStart;
-@@ -668,6 +689,11 @@ Boot (
+@@ -452,6 +477,82 @@ AllocateWindow (KERNEL *Kernel, UINT64 WindowSize, EFI_PHYSICAL_ADDRESS *Address
+   return Status;
+ }
+ 
++
++typedef struct {
++  EFI_DEVICE_PATH_PROTOCOL    Header;
++  EFI_GUID                    NameGuid;
++  CHAR16                      Name[1];
++} FV_FILEPATH_NODE;
++
++STATIC
++VOID
++PrintLoadedImages (
++  VOID
++  )
++{
++  EFI_STATUS                    Status;
++  EFI_HANDLE                    *Handles;
++  UINTN                         Count;
++  UINTN                         Index;
++
++  Status = gBS->LocateHandleBuffer (ByProtocol, &gEfiLoadedImageProtocolGuid, NULL, &Count, &Handles);
++  if (EFI_ERROR (Status)) {
++    return;
++  }
++
++  DEBUG ((DEBUG_ERROR, "--- images in the firmware volume ---\n"));
++  for (Index = 0; Index < Count; Index++) {
++    EFI_LOADED_IMAGE_PROTOCOL     *Loaded;
++    EFI_COMPONENT_NAME2_PROTOCOL  *Name2;
++    EFI_COMPONENT_NAME_PROTOCOL   *Name1;
++    CHAR16                        *DriverName;
++    CHAR16                        *DriverName8;
++    EFI_DEVICE_PATH_PROTOCOL      *Node;
++    CONST CHAR16                  *Name = NULL;
++
++    if (EFI_ERROR (gBS->HandleProtocol (Handles[Index], &gEfiLoadedImageProtocolGuid, (VOID **)&Loaded))) {
++      continue;
++    }
++
++    if ((UINTN)Loaded->ImageBase < 0x0000B0000000ULL) {
++      continue;
++    }
++
++    Node = Loaded->FilePath;
++    while ((Node != NULL) && !IsDevicePathEnd (Node)) {
++      if ((DevicePathType (Node) == MEDIA_DEVICE_PATH) && (DevicePathSubType (Node) == 0x06)) {
++        Name = ((FV_FILEPATH_NODE *)Node)->Name;
++        break;
++      }
++
++      Node = NextDevicePathNode (Node);
++    }
++
++    if ((Name != NULL) && (Name[0] != L'\0')) {
++      DEBUG ((DEBUG_ERROR, "%lx %lx %s\n", (UINT64)(UINTN)Loaded->ImageBase, (UINT64)Loaded->ImageSize, Name));
++      continue;
++    }
++
++    if (!EFI_ERROR (gBS->HandleProtocol (Handles[Index], &gEfiComponentName2ProtocolGuid, (VOID **)&Name2)) &&
++        (Name2->GetDriverName != NULL) &&
++        !EFI_ERROR (Name2->GetDriverName (Name2, "en", &DriverName)) && (DriverName != NULL)) {
++      DEBUG ((DEBUG_ERROR, "%lx %lx %s\n", (UINT64)(UINTN)Loaded->ImageBase, (UINT64)Loaded->ImageSize, DriverName));
++      continue;
++    }
++
++    if (!EFI_ERROR (gBS->HandleProtocol (Handles[Index], &gEfiComponentNameProtocolGuid, (VOID **)&Name1)) &&
++        (Name1->GetDriverName != NULL) &&
++        !EFI_ERROR (Name1->GetDriverName (Name1, "eng", &DriverName8)) && (DriverName8 != NULL)) {
++      DEBUG ((DEBUG_ERROR, "%lx %lx %s\n", (UINT64)(UINTN)Loaded->ImageBase, (UINT64)Loaded->ImageSize, DriverName8));
++      continue;
++    }
++
++    DEBUG ((DEBUG_ERROR, "%lx %lx ?\n", (UINT64)(UINTN)Loaded->ImageBase, (UINT64)Loaded->ImageSize));
++  }
++
++  FreePool (Handles);
++}
++
+ STATIC
+ EFI_STATUS
+ EFIAPI
+@@ -668,6 +769,11 @@ Boot (
    // screen first. This is what stays visible if the kernel never draws.
    //
    DEBUG ((DEBUG_ERROR, "\fDARWINBOOT: hand-off to the kernel\n\n"));
@@ -45,21 +139,97 @@ index e2c5d91..d71cf21 100644
    DEBUG ((DEBUG_ERROR, "kernel   va 0x%lx  pa 0x%lx\n", Kernel.Base, Address));
    DEBUG ((DEBUG_ERROR, "entry    pa 0x%lx\n", Address + Kernel.Entry - Kernel.Base));
    DEBUG ((DEBUG_ERROR, "args     pa 0x%lx  window 0x%lx bytes\n", ArgsAddress, (UINT64)WindowSize));
-@@ -682,14 +708,16 @@ Boot (
+@@ -681,8 +787,26 @@ Boot (
+   DEBUG ((DEBUG_ERROR, "ID_AA64MMFR0_EL1 0x%lx  (PARange %lu, 4 KiB granule %a)\n", READ_SYSREG (id_aa64mmfr0_el1),
            READ_SYSREG (id_aa64mmfr0_el1) & 0xF, (((READ_SYSREG (id_aa64mmfr0_el1) >> 28) & 0xF) == 0xF) ? "NOT supported" : "supported"));
    DEBUG ((DEBUG_ERROR, "ID_AA64PFR0_EL1  0x%lx\n", READ_SYSREG (id_aa64pfr0_el1)));
++  //
++  // Paint a yellow band over the top 1/16 of the panel while boot services are
++  // still alive. If it appears but DarwinEnter's green band does not, the
++  // problem is after ExitBootServices (a handler hanging, or writes no longer
++  // reaching DRAM), not in the firmware console.
++  //
++  if ((Video[0] != 0) && (Video[2] != 0) && (Video[4] != 0)) {
++    UINT32 *Band = (UINT32 *)(UINTN)Video[0];
++    UINTN   PixelsPerRow = Video[2] / 4;
++    UINTN   Row;
++    for (Row = 0; Row < (Video[4] / 16); Row++) {
++      UINTN Column;
++      for (Column = 0; Column < PixelsPerRow; Column++) {
++        Band[Row * PixelsPerRow + Column] = 0x00FFFF00;   // yellow, BGRA
++      }
++    }
++  }
++  PrintLoadedImages ();
    DEBUG ((DEBUG_ERROR, "\nExiting boot services. A green bar across the top\nmarks the loader handoff before the kernel branch.\n"));
 -  for (Attempt = 0; Attempt < 3; Attempt++) {
 +  for (Attempt = 0; Attempt < 16; Attempt++) {
      MapSize = Capacity;
      Status = gBS->GetMemoryMap (&MapSize, Map, &Key, &Stride, &Version);
      if (EFI_ERROR (Status)) {
-+      DEBUG ((DEBUG_ERROR, "DARWINBOOT: GetMemoryMap attempt %lu: %r\n", (UINT64)Attempt, Status));
-       if (Attempt == 0) { goto Fail; }
+@@ -690,6 +814,39 @@ Boot (
        CpuDeadLoop ();
      }
      Status = gBS->ExitBootServices (mImage, Key);
-+    DEBUG ((DEBUG_ERROR, "DARWINBOOT: ExitBootServices attempt %lu: %r\n", (UINT64)Attempt, Status));
++    //
++    // Draw one white 24x32 mark per failed attempt straight into the frame
++    // buffer: boot services may already be gone, so no DEBUG and no gBS here.
++    // Counting the marks tells a failing ExitBootServices from a hung handler.
++    //
++    if (EFI_ERROR (Status) && (Video[0] != 0) && (Video[2] != 0)) {
++      UINT32 *Fb = (UINT32 *)(UINTN)Video[0];
++      UINTN   RowPixels = Video[2] / 4;
++      UINTN   Row;
++      UINTN   Col;
++      UINTN   X0 = 8 + (Attempt * 32);
++      for (Row = 8; Row < 40; Row++) {
++        for (Col = X0; Col < X0 + 24; Col++) {
++          Fb[Row * RowPixels + Col] = 0x00FFFFFF;
++        }
++      }
++    }
++    //
++    // ExitBootServices returned: mark the frame buffer directly, since no boot
++    // service (and therefore no DEBUG) is available any more.
++    //
++    if ((Video[0] != 0) && (Video[2] != 0)) {
++      UINT32 *Fb = (UINT32 *)(UINTN)Video[0];
++      UINTN   RowPixels = Video[2] / 4;
++      UINTN   Row;
++      UINTN   Col;
++      UINT32  Colour = EFI_ERROR (Status) ? 0x000000FF : 0x00FFFFFF;   // red on error, white on success
++      for (Row = 8; Row < 120; Row++) {
++        for (Col = 400; Col < 600; Col++) {
++          Fb[Row * RowPixels + Col] = Colour;
++        }
++      }
++    }
      if (!EFI_ERROR (Status)) {
        DarwinEnter (ArgsAddress, Address + Kernel.Entry - Kernel.Base, Address, WindowSize, Video[0], Video[2] * Video[4]);
        CpuDeadLoop ();
+diff --git a/DarwinBootPkg/Driver/Entry.S b/DarwinBootPkg/Driver/Entry.S
+index a7a55c2..1e11ac2 100644
+--- a/DarwinBootPkg/Driver/Entry.S
++++ b/DarwinBootPkg/Driver/Entry.S
+@@ -22,6 +22,21 @@ ASM_FUNC(DarwinEnter)
+   subs x9, x9, #8
+   b.hi 3b
+   dsb sy
++  // Clean the bar out of the data cache: the loop below only cleans the kernel
++  // window, so without this the bar can stay in cache and never reach the panel.
++  mrs x6, ctr_el0
++  ubfx x6, x6, #16, #4
++  mov x7, #4
++  lsl x6, x7, x6
++  sub x7, x6, #1
++  bic x12, x4, x7
++  add x13, x4, x9
++4:
++  dc civac, x12
++  add x12, x12, x6
++  cmp x12, x13
++  b.lo 4b
++  dsb sy
+ 2:
+   add x5, x2, x3
+   mrs x6, ctr_el0
