@@ -294,49 +294,6 @@
 			};
 		};
 
-		cpu-map {
-
-			cluster0 {
-
-				core0 {
-					cpu = <0x0d>;
-				};
-
-				core1 {
-					cpu = <0x0e>;
-				};
-
-				core2 {
-					cpu = <0x0f>;
-				};
-
-				core3 {
-					cpu = <0x10>;
-				};
-			};
-
-			cluster1 {
-
-				core0 {
-					cpu = <0x11>;
-				};
-
-				core1 {
-					cpu = <0x12>;
-				};
-
-				core2 {
-					cpu = <0x13>;
-				};
-			};
-
-			cluster2 {
-
-				core0 {
-					cpu = <0x14>;
-				};
-			};
-		};
 	};
 
 	cpu-pmu {
