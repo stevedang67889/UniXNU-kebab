@@ -1,0 +1,567 @@
+diff --git a/BootShim/BootShim.S b/BootShim/BootShim.S
+index 4d208553..3bc899a2 100644
+--- a/BootShim/BootShim.S
++++ b/BootShim/BootShim.S
+@@ -7,7 +7,7 @@ _StackBase:
+   .quad FD_BASE         /* Text Offset */
+ 
+ _StackSize:
+-  .quad FD_SIZE         /* Image Size */
++  .quad FD_SIZE + (_Payload - _Head)   /* Image Size: shim + firmware volume */
+   .quad 0               /* Flags */
+   .quad 0               /* Reserved */
+   .quad 0               /* Reserved */
+diff --git a/Platforms/OnePlus/kebabPkg/Include/DXE.inc b/Platforms/OnePlus/kebabPkg/Include/DXE.inc
+index 668d2553..63e6881c 100644
+--- a/Platforms/OnePlus/kebabPkg/Include/DXE.inc
++++ b/Platforms/OnePlus/kebabPkg/Include/DXE.inc
+@@ -56,7 +56,7 @@
+   INF Binaries/kebab/QcomPkg/Drivers/SPIDxe/SPIDxe.inf
+   INF Binaries/kebab/QcomPkg/Drivers/SPMIDxe/SPMIDxe.inf
+   INF Binaries/kebab/QcomPkg/Drivers/SdccDxe/SdccDxe.inf
+-  INF Binaries/kebab/QcomPkg/Drivers/UFSDxe/UFSDxe.inf
++  # INF Binaries/kebab/QcomPkg/Drivers/UFSDxe/UFSDxe.inf   # vendor driver hangs/asserts
+   INF Binaries/kebab/QcomPkg/Drivers/TLMMDxe/TLMMDxe.inf
+   INF Binaries/kebab/QcomPkg/Drivers/FeatureEnablerDxe/FeatureEnablerDxe.inf
+ 
+diff --git a/Platforms/OnePlus/kebabPkg/Library/ConfigurationMapLib/ConfigurationMapLib.c b/Platforms/OnePlus/kebabPkg/Library/ConfigurationMapLib/ConfigurationMapLib.c
+index 904ee6ee..3ae28da2 100644
+--- a/Platforms/OnePlus/kebabPkg/Library/ConfigurationMapLib/ConfigurationMapLib.c
++++ b/Platforms/OnePlus/kebabPkg/Library/ConfigurationMapLib/ConfigurationMapLib.c
+@@ -23,7 +23,7 @@ gConfigurationDescriptor[] = {
+   {"Sdc1GpioConfigOff", 0xA00},
+   {"Sdc2GpioConfigOff", 0xA00},
+   {"EnableSDHCSwitch", 0x1},
+-  {"EnableUfsIOC", 0},
++  {"EnableUfsIOC", 1},
+   {"UfsSmmuConfigForOtherBootDev", 1},
+   {"SecurityFlag", 0xC4},
+   {"EnableLogFsSyncInRetail", 0x0},
+diff --git a/Platforms/OnePlus/kebabPkg/kebab.dsc b/Platforms/OnePlus/kebabPkg/kebab.dsc
+index 767231c1..9d8d14a9 100644
+--- a/Platforms/OnePlus/kebabPkg/kebab.dsc
++++ b/Platforms/OnePlus/kebabPkg/kebab.dsc
+@@ -24,6 +24,7 @@
+   SKUID_IDENTIFIER               = DEFAULT
+   FLASH_DEFINITION               = kebabPkg/kebab.fdf
+   USE_CUSTOM_DISPLAY_DRIVER      = 0
++  USE_UART                       = 0
+ 
+   #
+   # 0 = SM8250
+@@ -83,3 +84,26 @@
+   # ACPI Tables
+   #
+   kebab/AcpiTables.inf
++
++[LibraryClasses]
++  UniXNULib|UniXNUPkg/Library/UniXNULib/UniXNULib.inf
++  FileExplorerLib|MdeModulePkg/Library/FileExplorerLib/FileExplorerLib.inf
++  AdvancedLoggerLib|AdvLoggerPkg/Library/AdvancedLoggerLib/Dxe/AdvancedLoggerLib.inf
++  AdvancedLoggerAccessLib|AdvLoggerPkg/Library/AdvancedLoggerAccessLib/AdvancedLoggerAccessLib.inf
++  QrEncoderLib|MsGraphicsPkg/Library/QrEncoderLib/QrEncoderLib.inf
++  FdtLib|MdePkg/Library/BaseFdtLib/BaseFdtLib.inf
++  HobLib|MdePkg/Library/DxeHobLib/DxeHobLib.inf
++
++[Packages]
++  UniXNUPkg/UniXNUPkg.dec
++  AdvLoggerPkg/AdvLoggerPkg.dec
++  MsGraphicsPkg/MsGraphicsPkg.dec
++
++[Components]
++  UniXNUPkg/Driver/UniXNUDxe/UniXNUDxe.inf
++  UniXNUPkg/Application/UniXNU/UniXNU.inf
++  UniXNUPkg/Driver/AdvancedLogDxe/AdvancedLogDxe.inf
++  DarwinBootPkg/Driver/DarwinBoot.inf
++  # UniXNUPkg/Driver/FsProbe/FsProbe.inf   # diagnostic, halts on purpose
++  MdeModulePkg/Universal/Disk/RamDiskDxe/RamDiskDxe.inf
++  kebabPkg/Driver/KebabRamDisk/KebabRamDisk.inf
+diff --git a/Platforms/OnePlus/kebabPkg/kebab.fdf b/Platforms/OnePlus/kebabPkg/kebab.fdf
+index 171876d1..a430710f 100644
+--- a/Platforms/OnePlus/kebabPkg/kebab.fdf
++++ b/Platforms/OnePlus/kebabPkg/kebab.fdf
+@@ -43,10 +43,14 @@ NumBlocks     = $(FD_BLOCKS)
+ #
+ ################################################################################
+ 
+-0x00000000|$(FD_SIZE)
++0x00000000|0x00300000
+ gArmTokenSpaceGuid.PcdFvBaseAddress|gArmTokenSpaceGuid.PcdFvSize
+ FV = FVMAIN_COMPACT
+ 
++0x00300000|0x4300000
++FILE = /home/moemo/kebabwork/verify-payload-mbr.img
++
++
+ ################################################################################
+ #
+ # FV Section
+@@ -102,6 +106,17 @@ READ_LOCK_STATUS   = TRUE
+   #  SECTION UI = "DeviceTreeBlob"
+   #}
+ 
++  #
++  # UniXNU boot manager
++  #
++  INF UniXNUPkg/Driver/UniXNUDxe/UniXNUDxe.inf
++  INF DarwinBootPkg/Driver/DarwinBoot.inf
++  INF UniXNUPkg/Driver/AdvancedLogDxe/AdvancedLogDxe.inf
++  INF UniXNUPkg/Application/UniXNU/UniXNU.inf
++  # FsProbe disabled
++  INF MdeModulePkg/Universal/Disk/RamDiskDxe/RamDiskDxe.inf
++  INF kebabPkg/Driver/KebabRamDisk/KebabRamDisk.inf
++
+   !include QcomPkg/Extra.fdf.inc
+ 
+ [FV.FVMAIN_COMPACT]
+@@ -124,6 +139,10 @@ READ_LOCK_STATUS   = TRUE
+ 
+   INF SiliciumPkg/Sec/Sec.inf
+ 
++  # Payload FAT image, split because an FFS file is limited to 0xFFFFFF bytes.
++  # Payload FAT image, uncompressed so the RAM disk can point at it directly.
++
++
+   FILE FV_IMAGE = 9E21FD93-9C72-4c15-8C4B-E77F1DB2D792 {
+     SECTION GUIDED EE4E5898-3914-4259-9D6E-DC7BD79403CF PROCESSING_REQUIRED = TRUE {
+       SECTION FV_IMAGE = FVMAIN
+diff --git a/Resources/Configs/kebab.toml b/Resources/Configs/kebab.toml
+index 8191aaf4..06a5c6fe 100755
+--- a/Resources/Configs/kebab.toml
++++ b/Resources/Configs/kebab.toml
+@@ -9,7 +9,7 @@ requires_kernel_header = true
+ #
+ [uefi_fd]
+ base = 0x9FC00000
+-size = 0x300000
++size = 0x4600000   # 3 MiB FV + 70 MiB payload region
+ 
+ #
+ # Android Boot Image Kernel Configs
+diff --git a/Silicon/Silicium/SiliciumPkg/Library/FrameBufferSerialPortLib/FrameBufferSerialPortLib.c b/Silicon/Silicium/SiliciumPkg/Library/FrameBufferSerialPortLib/FrameBufferSerialPortLib.c
+index d2844e0a..efbb3e8a 100644
+--- a/Silicon/Silicium/SiliciumPkg/Library/FrameBufferSerialPortLib/FrameBufferSerialPortLib.c
++++ b/Silicon/Silicium/SiliciumPkg/Library/FrameBufferSerialPortLib/FrameBufferSerialPortLib.c
+@@ -183,6 +183,12 @@ WriteFrameBuffer (
+       AdvanceNewLine (FbBase, FbLength, CurrentPosition, MaxPosition);
+     } else if (Character == '\r') {
+       CurrentPosition->XPos = 0;
++    } else if (Character == '\f') {
++      // Form feed clears the screen and homes the cursor. DarwinBoot uses it to
++      // put its hand-off log at the top of the panel.
++      ZeroMem ((VOID *)FbBase, FB_WIDTH * FB_HEIGHT * FB_BPP);
++      CurrentPosition->XPos = 0;
++      CurrentPosition->YPos = 0;
+     }
+ 
+     return;
+@@ -250,6 +256,33 @@ SerialPortWrite (
+ 
+   // Get Frame Buffer Memory
+   Status = GetFrameBufferMemory (&FbBase, &FbLength);
++
++  // One-shot calibration grid: a marker every 100 pixels along the top row and
++  // the left column, so a photo reveals the real stride and visible area.
++  {
++    STATIC BOOLEAN  Probed = FALSE;
++    if (!Probed && !EFI_ERROR (Status)) {
++      UINT32 *Fb = (UINT32 *)(UINTN)FbBase;
++      UINTN   X, Y, I;
++      Probed = TRUE;
++      for (I = 0; I < 40; I++) {
++        X = I * 100;
++        if (X >= FB_WIDTH) break;
++        for (Y = 0; Y < 80; Y++) {
++          Fb[Y * FB_WIDTH + X] = 0x00FFFFFF;                       // top ruler
++          Fb[(FB_HEIGHT - 1 - Y) * FB_WIDTH + X] = 0x00FFFFFF;     // bottom ruler
++        }
++      }
++      for (I = 0; I < 40; I++) {
++        Y = I * 100;
++        if (Y >= FB_HEIGHT) break;
++        for (X = 0; X < 80; X++) {
++          Fb[Y * FB_WIDTH + X] = 0x00FF00FF;                       // left ruler
++          Fb[Y * FB_WIDTH + (FB_WIDTH - 1 - X)] = 0x00FF00FF;      // right ruler
++        }
++      }
++    }
++  }
+   if (EFI_ERROR (Status)) {
+     return 0;
+   }
+diff --git a/Silicon/Silicium/SiliciumPkg/Sec/Sec.c b/Silicon/Silicium/SiliciumPkg/Sec/Sec.c
+index 8d586b35..8d4d65ba 100644
+--- a/Silicon/Silicium/SiliciumPkg/Sec/Sec.c
++++ b/Silicon/Silicium/SiliciumPkg/Sec/Sec.c
+@@ -1,174 +1,181 @@
+-/**
+-  Copyright (c) 2011-2017, ARM Limited. All rights reserved.
+-  SPDX-License-Identifier: BSD-2-Clause-Patent
+-**/
+-
+-#include <Library/PcdLib.h>
+-#include <Library/DebugLib.h>
+-#include <Library/PrePiLib.h>
+-#include <Library/DebugAgentLib.h>
+-#include <Library/BaseMemoryLib.h>
+-#include <Library/SerialPortLib.h>
+-#include <Library/PlatformSecLib.h>
+-#include <Library/PrePiHobListPointerLib.h>
+-#include <Library/CacheMaintenanceLib.h>
+-#include <Library/MemoryMapHelperLib.h>
+-#include <Library/TimerLib.h>
+-#include <Library/HobLib.h>
+-
+-#include "Sec.h"
+-
+-#ifndef MDEPKG_NDEBUG
+-STATIC
+-VOID
+-ClearFrameBuffer (VOID)
+-{
+-  EFI_MEMORY_REGION_DESCRIPTOR FrameBufferRegion;
+-
+-  // Locate "Display Reserved" Memory Region
+-  LocateMemoryRegionByName ("Display Reserved", &FrameBufferRegion);
+-  LocateMemoryRegionByName ("Display_Reserved", &FrameBufferRegion);
+-
+-  // Clear Memory Region
+-  if (FrameBufferRegion.Address != 0 && FrameBufferRegion.Length != 0) {
+-    ZeroMem ((VOID *)FrameBufferRegion.Address, FrameBufferRegion.Length);
+-  }
+-}
+-
+-STATIC
+-VOID
+-PrintFirmwareVersion (VOID)
+-{
+-  // Clear Frame Buffer
+-  ClearFrameBuffer ();
+-
+-  // Print UEFI Version Message
+-  DEBUG ((EFI_D_WARN, "\n"));
+-  DEBUG ((EFI_D_WARN, "Project Silicium for %a %a\n",            FixedPcdGetPtr (PcdSmbiosSystemManufacturer), FixedPcdGetPtr (PcdSmbiosSystemModel)));
+-  DEBUG ((EFI_D_WARN, "Firmware Version %s Build at %a on %a\n", PcdGetPtr (PcdFirmwareVersionString), __TIME__, __DATE__));
+-  DEBUG ((EFI_D_WARN, "\n"));
+-}
+-#endif
+-
+-STATIC
+-EFI_STATUS
+-InitializeMemory (VOID)
+-{
+-  EFI_STATUS                    Status;
+-  EFI_MEMORY_REGION_DESCRIPTOR  UefiMemoryRegion;
+-  EFI_HOB_HANDOFF_INFO_TABLE   *HobList;
+-
+-  // Locate "DXE Heap" Memory Region
+-  LocateMemoryRegionByName ("DXE Heap", &UefiMemoryRegion);
+-  LocateMemoryRegionByName ("DXE_Heap", &UefiMemoryRegion);
+-
+-  // Save UEFI Memory Details
+-  UINTN UefiMemoryBase = UefiMemoryRegion.Address;
+-  UINTN UefiMemorySize = UefiMemoryRegion.Length;
+-
+-  // Verify UEFI Memory Base
+-  if (UefiMemoryBase == 0 && UefiMemorySize == 0) {
+-    DEBUG ((EFI_D_ERROR, "Failed to Locate \"DXE Heap\" Memory Region!\n"));
+-    return EFI_NOT_FOUND;
+-  }
+-
+-  // Initialize HOB List
+-  HobList = HobConstructor ((VOID *)UefiMemoryBase, UefiMemorySize, (VOID *)UefiMemoryBase, (VOID *)(UefiMemoryBase + UefiMemorySize));
+-  PrePeiSetHobList (HobList);
+-
+-  // Initialize MMU & Memory HOBs
+-  Status = MemoryPeim (UefiMemoryBase, UefiMemorySize);
+-  if (EFI_ERROR (Status)) {
+-    return Status;
+-  }
+-
+-  // Build Stack HOB
+-  BuildStackHob (FixedPcdGet64 (PcdCPUCoresStackBase), FixedPcdGet32 (PcdCPUCorePrimaryStackSize));
+-
+-  return EFI_SUCCESS;
+-}
+-
+-STATIC
+-VOID
+-SecMain (VOID)
+-{
+-  EFI_STATUS Status;
+-
+-  // Do Platform Specific Initialization
+-  PlatformInitialize ();
+-
+-#ifndef MDEPKG_NDEBUG
+-  // Initialize Serial Port
+-  Status = SerialPortInitialize ();
+-  if (EFI_ERROR (Status)) {
+-    return;
+-  }
+-
+-  // Print Firmware Version
+-  PrintFirmwareVersion ();
+-
+-  // Initialize Debug Agent
+-  InitializeDebugAgent (DEBUG_AGENT_INIT_POSTMEM_SEC, NULL, NULL);
+-  SaveAndSetDebugTimerInterrupt (TRUE);
+-#endif
+-
+-  // Initialize Memory
+-  Status = InitializeMemory ();
+-  if (EFI_ERROR (Status)) {
+-    return;
+-  }
+-
+-  // Build CPU HOB
+-  BuildCpuHob (ArmGetPhysicalAddressBits (), PcdGet8 (PcdPrePiCpuIoSize));
+-
+-  // Set the Boot Mode
+-  SetBootMode (BOOT_WITH_DEFAULT_SETTINGS);
+-
+-  // Initialize Platform HOBs
+-  Status = PlatformPeim ();
+-  if (EFI_ERROR (Status)) {
+-    return;
+-  }
+-
+-  // Run Library Cconstructors
+-  ProcessLibraryConstructorList ();
+-
+-  // Decompress all FVs
+-  Status = DecompressFirstFv ();
+-  if (EFI_ERROR (Status)) {
+-    DEBUG ((EFI_D_ERROR, "Failed to Decompress FV! Status = %r\n", Status));
+-    return;
+-  }
+-
+-  // Load DXE Core
+-  Status = LoadDxeCoreFromFv (NULL, 0);
+-  if (EFI_ERROR (Status)) {
+-    DEBUG ((EFI_D_ERROR, "Failed to Load DXE Core! Status = %r\n", Status));
+-  }
+-}
+-
+-VOID
+-SecEntry (VOID)
+-{
+-  // Disable Data Cache
+-  ArmDisableDataCache ();
+-
+-  // Invalidate Instruction Cache
+-  ArmInvalidateInstructionCache ();
+-
+-  // Enable Instruction Cache
+-  ArmEnableInstructionCache ();
+-
+-  // Invalidate Stack & UEFI FD D-Cache
+-  InvalidateDataCacheRange ((VOID *)FixedPcdGet64 (PcdCPUCoresStackBase), FixedPcdGet32 (PcdCPUCorePrimaryStackSize));
+-  InvalidateDataCacheRange ((VOID *)FixedPcdGet64 (PcdFdBaseAddress),     FixedPcdGet32 (PcdFdSize));
+-
+-  // Verify Exception Vector Table
+-  ASSERT (((UINTN)SecVectorTable & ARM_VECTOR_TABLE_ALIGNMENT) == 0);
+-
+-  // Enable new Exception Vector Table
+-  ArmWriteVBar ((UINTN)SecVectorTable);
+-
+-  // Enter Main SEC Function
+-  SecMain ();
+-}
++/**
++  Copyright (c) 2011-2017, ARM Limited. All rights reserved.
++  SPDX-License-Identifier: BSD-2-Clause-Patent
++**/
++
++#include <Library/PcdLib.h>
++#include <Library/DebugLib.h>
++#include <Library/PrePiLib.h>
++#include <Library/DebugAgentLib.h>
++#include <Library/BaseMemoryLib.h>
++#include <Library/SerialPortLib.h>
++#include <Library/PlatformSecLib.h>
++#include <Library/PrePiHobListPointerLib.h>
++#include <Library/CacheMaintenanceLib.h>
++#include <Library/MemoryMapHelperLib.h>
++#include <Library/TimerLib.h>
++#include <Library/HobLib.h>
++
++#include "Sec.h"
++
++#ifndef MDEPKG_NDEBUG
++STATIC
++VOID
++ClearFrameBuffer (VOID)
++{
++  EFI_MEMORY_REGION_DESCRIPTOR FrameBufferRegion;
++
++  // Locate "Display Reserved" Memory Region
++  LocateMemoryRegionByName ("Display Reserved", &FrameBufferRegion);
++  LocateMemoryRegionByName ("Display_Reserved", &FrameBufferRegion);
++
++  // Clear Memory Region
++  if (FrameBufferRegion.Address != 0 && FrameBufferRegion.Length != 0) {
++    ZeroMem ((VOID *)FrameBufferRegion.Address, FrameBufferRegion.Length);
++  }
++}
++
++STATIC
++VOID
++PrintFirmwareVersion (VOID)
++{
++  // Clear Frame Buffer
++  ClearFrameBuffer ();
++
++  // Print UEFI Version Message
++  DEBUG ((EFI_D_WARN, "\n"));
++  DEBUG ((EFI_D_WARN, "Project Silicium for %a %a\n",            FixedPcdGetPtr (PcdSmbiosSystemManufacturer), FixedPcdGetPtr (PcdSmbiosSystemModel)));
++  DEBUG ((EFI_D_WARN, "Firmware Version %s Build at %a on %a\n", PcdGetPtr (PcdFirmwareVersionString), __TIME__, __DATE__));
++  DEBUG ((EFI_D_WARN, "\n"));
++}
++#endif
++
++STATIC
++EFI_STATUS
++InitializeMemory (VOID)
++{
++  EFI_STATUS                    Status;
++  EFI_MEMORY_REGION_DESCRIPTOR  UefiMemoryRegion;
++  EFI_HOB_HANDOFF_INFO_TABLE   *HobList;
++
++  // Locate "DXE Heap" Memory Region
++  LocateMemoryRegionByName ("DXE Heap", &UefiMemoryRegion);
++  LocateMemoryRegionByName ("DXE_Heap", &UefiMemoryRegion);
++
++  // Save UEFI Memory Details
++  UINTN UefiMemoryBase = UefiMemoryRegion.Address;
++  UINTN UefiMemorySize = UefiMemoryRegion.Length;
++
++  // Verify UEFI Memory Base
++  if (UefiMemoryBase == 0 && UefiMemorySize == 0) {
++    DEBUG ((EFI_D_ERROR, "Failed to Locate \"DXE Heap\" Memory Region!\n"));
++    return EFI_NOT_FOUND;
++  }
++
++  // Initialize HOB List
++  HobList = HobConstructor ((VOID *)UefiMemoryBase, UefiMemorySize, (VOID *)UefiMemoryBase, (VOID *)(UefiMemoryBase + UefiMemorySize));
++  PrePeiSetHobList (HobList);
++
++  // Initialize MMU & Memory HOBs
++  Status = MemoryPeim (UefiMemoryBase, UefiMemorySize);
++  if (EFI_ERROR (Status)) {
++    return Status;
++  }
++
++  // Build Stack HOB
++  BuildStackHob (FixedPcdGet64 (PcdCPUCoresStackBase), FixedPcdGet32 (PcdCPUCorePrimaryStackSize));
++
++  return EFI_SUCCESS;
++}
++
++STATIC
++VOID
++SecMain (VOID)
++{
++  EFI_STATUS Status;
++
++  // Do Platform Specific Initialization
++  PlatformInitialize ();
++
++#ifndef MDEPKG_NDEBUG
++  // Initialize Serial Port
++  Status = SerialPortInitialize ();
++  if (EFI_ERROR (Status)) {
++    return;
++  }
++
++  // Print Firmware Version
++  PrintFirmwareVersion ();
++
++  // Initialize Debug Agent
++  InitializeDebugAgent (DEBUG_AGENT_INIT_POSTMEM_SEC, NULL, NULL);
++  SaveAndSetDebugTimerInterrupt (TRUE);
++#endif
++
++  // Initialize Memory
++  Status = InitializeMemory ();
++  if (EFI_ERROR (Status)) {
++    return;
++  }
++
++  // Build CPU HOB
++  BuildCpuHob (ArmGetPhysicalAddressBits (), PcdGet8 (PcdPrePiCpuIoSize));
++
++  // Set the Boot Mode
++  SetBootMode (BOOT_WITH_DEFAULT_SETTINGS);
++
++  // Initialize Platform HOBs
++  Status = PlatformPeim ();
++  if (EFI_ERROR (Status)) {
++    return;
++  }
++
++  // Run Library Cconstructors
++  ProcessLibraryConstructorList ();
++
++  // Decompress all FVs
++  Status = DecompressFirstFv ();
++  if (EFI_ERROR (Status)) {
++    DEBUG ((EFI_D_ERROR, "Failed to Decompress FV! Status = %r\n", Status));
++    return;
++  }
++
++  // Load DXE Core
++  Status = LoadDxeCoreFromFv (NULL, 0);
++  if (EFI_ERROR (Status)) {
++    DEBUG ((EFI_D_ERROR, "Failed to Load DXE Core! Status = %r\n", Status));
++  }
++}
++
++VOID
++SecEntry (VOID)
++{
++  //
++  // KEBAB: disable the APSS watchdog first, so a later fault leaves the last
++  // framebuffer text on screen instead of resetting the phone.
++  // APSS_HM 0x17800000 + WDT 0x410000 + ENABLE 0x8 (KonaPkg PlatformRegisters.h).
++  //
++  *(volatile UINT32 *)(0x17C10008UL) = 0;
++
++  // Disable Data Cache
++  ArmDisableDataCache ();
++
++  // Invalidate Instruction Cache
++  ArmInvalidateInstructionCache ();
++
++  // Enable Instruction Cache
++  ArmEnableInstructionCache ();
++
++  // Invalidate Stack & UEFI FD D-Cache
++  InvalidateDataCacheRange ((VOID *)FixedPcdGet64 (PcdCPUCoresStackBase), FixedPcdGet32 (PcdCPUCorePrimaryStackSize));
++  InvalidateDataCacheRange ((VOID *)FixedPcdGet64 (PcdFdBaseAddress),     FixedPcdGet32 (PcdFdSize));
++
++  // Verify Exception Vector Table
++  ASSERT (((UINTN)SecVectorTable & ARM_VECTOR_TABLE_ALIGNMENT) == 0);
++
++  // Enable new Exception Vector Table
++  ArmWriteVBar ((UINTN)SecVectorTable);
++
++  // Enter Main SEC Function
++  SecMain ();
++}
+diff --git a/Silicon/Silicium/SiliciumPkg/SiliciumPkg.dsc.inc b/Silicon/Silicium/SiliciumPkg/SiliciumPkg.dsc.inc
+index 00ec09e1..61cc7756 100644
+--- a/Silicon/Silicium/SiliciumPkg/SiliciumPkg.dsc.inc
++++ b/Silicon/Silicium/SiliciumPkg/SiliciumPkg.dsc.inc
+@@ -158,7 +158,10 @@
+   #
+   # Debug Libraries
+   #
+-!if $(TARGET) == DEBUG
++!if $(USE_UART) == 1
++  SerialPortLib|QcomPkg/Library/UARTSerialPortLib/UARTSerialPortLib.inf
++  DebugLib|MdePkg/Library/BaseDebugLibSerialPort/BaseDebugLibSerialPort.inf
++!elseif $(TARGET) == DEBUG
+   SerialPortLib|SiliciumPkg/Library/FrameBufferSerialPortLib/FrameBufferSerialPortLib.inf
+   DebugLib|MdePkg/Library/BaseDebugLibSerialPort/BaseDebugLibSerialPort.inf
+ !else

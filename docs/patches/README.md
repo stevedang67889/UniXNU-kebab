@@ -20,3 +20,23 @@ The Mu-Silicium side needs changes that are not patches against a git tree here:
 `ConfigurationMapLib.c` (`EnableUfsIOC = 1`),
 `Sec/Sec.c` (disable the APSS watchdog at `0x17C10008`), and
 `FrameBufferSerialPortLib.c` (handle `\f` as clear-and-home).
+## `mu-silicium-kebab.patch`
+
+Applies to Mu-Silicium at `42fe5637`. It carries the platform changes that are
+not part of any UniXNU repository:
+
+| File | Change |
+| --- | --- |
+| `BootShim/BootShim.S` | shim adjustments used by the kebab boot image |
+| `kebabPkg/kebab.dsc` | adds `KebabRamDisk`, `DarwinBoot`, the framebuffer PCDs (`1080x2400x32`), the FDT/HOB libraries and the `UniXNUPkg` modules |
+| `kebabPkg/kebab.fdf` | FV layout: 3 MiB firmware volume at `0`, raw payload region at `0x00300000` |
+| `kebabPkg/Include/DXE.inc` | drops the vendor `UFSDxe`, which asserts on this board |
+| `kebabPkg/Library/ConfigurationMapLib` | `EnableUfsIOC = 1`, which removes the UFS assertion but still yields no block device |
+| `Resources/Configs/kebab.toml` | FD size `0x4600000` (3 MiB FV + 70 MiB payload region) |
+| `SiliconPkg/Sec/Sec.c` | disables the APSS watchdog at `0x17C10008` so a fault leaves the panel readable |
+| `SiliconPkg/Library/FrameBufferSerialPortLib` | treats `\f` as clear-and-home so the DarwinBoot log starts at the top |
+| `SiliconPkg/SiliciumPkg.dsc.inc` | library class mappings the kebab platform needs |
+
+`Platforms/OnePlus/kebabPkg/Driver/KebabRamDisk/` is untracked in Mu-Silicium and
+lives in the [KebabRamDisk](https://github.com/stevedang67889/KebabRamDisk)
+repository instead.
