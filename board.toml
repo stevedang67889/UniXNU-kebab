@@ -105,6 +105,7 @@ packages = [
   "{uefi}/Silicium-ACPI/Silicon/Qualcomm",
   "{tree}/package",
   "{tree}/drivers",
+  "{tree}/drivers/DarwinBoot",
 ]
 defines = { ENABLE_SECUREBOOT = 0, DEVICE_MODEL = 0 }
 
