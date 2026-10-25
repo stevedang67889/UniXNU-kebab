@@ -110,3 +110,62 @@ so UniXNU never sees a volume and falls back to its built-in
    with that file works.
 3. Then the `xnu` entry in `package/unixnu.toml` can load `Payloads/kernel.macho`
    with its `kernel.macho.adt` sidecar.
+
+## 2026-10-25: payload volume found, kernel hand-off reached
+
+### What works
+
+- Mu-Silicium UEFI boots on the device from `boot_a` with the phone's own live
+  device tree. The Mu-shipped `kebab.dtb` has no `cont_splash_region@9c000000`
+  node, so ABL refuses to hand the framebuffer over and the screen stays black.
+- The UniXNU menu appears and lists the entry generated from `board.toml`
+  instead of the built-in fallback menu, which means the payload volume was
+  found, partitioned and mounted.
+- DarwinBoot exits boot services and prints the hand-off log with the kernel
+  virtual base, physical base, boot args, video geometry and CPU state.
+
+### Payload delivery
+
+The payload is a raw FDF region at `0x00300000` (FD base `0x9FC00000`), published
+by `drivers/KebabRamDisk` as a `EFI_BLOCK_IO_PROTOCOL` device with a vendor
+device path so `PartitionDxe` binds and `FatPkg` mounts it. Two alternatives fail
+on this board:
+
+- payload as an FFS file: the FFS size field is 24 bits, a 64 MiB payload cannot
+  be expressed;
+- `RamDiskDxe` + `EFI_RAM_DISK_PROTOCOL`: `Register` returns
+  `EFI_INVALID_PARAMETER` because it requires page-allocated memory.
+
+### Framebuffer console
+
+`FrameBufferSerialPortLib` handled `\n` and `\r` but ignored `\f`. DarwinBoot
+starts its hand-off log with a form feed, so the log continued from wherever the
+firmware log stopped and the left half of every line was cut off. Handling `\f`
+as "clear the screen and home the cursor" makes the hand-off log readable from
+the first line, which is how the kernel base and video geometry above were read.
+
+The stride must stay `(FB_WIDTH - FONT_WIDTH * FontScale) * FB_BPP`: that is the
+advance from one glyph row to the next same column, not the scanline length.
+Using `FB_WIDTH * FB_BPP` there shears every glyph.
+
+### Kernel load address
+
+DarwinBoot used to take the first conventional-memory run that fits, which is
+`0x7D000` on this board. The kernel then faulted during `_arm_init` before
+`_machine_startup` (the stage bars never appeared and no reset probe fired).
+The window is now taken at `0x40000000` and above; the kernel lands at
+`0xC007C000`.
+
+### Where it stops now
+
+`DARWINBOOT: hand-off to the kernel` is printed, `entry words 14000BF5` confirms
+the patched entry instruction, and then the screen stays black. The green bar
+that `DarwinEnter` paints after `ExitBootServices` has never been observed,
+which suggests the hand-off itself may not complete rather than the kernel
+faulting later. `ExitBootServices` is retried 16 times with each result logged.
+
+### Device repository state
+
+`dram_size` and the `/memory` node in `dts/kebab.dts` are both restricted to the
+first contiguous DRAM chunk (`0x80000000`, `0x39900000` bytes). The real map is
+three discontiguous ranges and the ADT generator only accepts one.

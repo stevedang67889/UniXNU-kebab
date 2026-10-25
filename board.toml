@@ -127,8 +127,8 @@ volume = "KEBABESP"
 size_mib = 64
 loader = "firmware"
 title = "kebab first boot: source 4K XNU to console"
-dram_size = "0x300000000"
-panic_screen = false
+dram_size = "0x39900000"   # first contiguous DRAM chunk; the full map is discontiguous
+panic_screen = false     # true installs the entry probe and the panic screen
 kernel_args = [
   "-v",
   "serial=3",
