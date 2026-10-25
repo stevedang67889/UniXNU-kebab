@@ -1,0 +1,17 @@
+diff --git a/scripts/unixnu/bootimg.py b/scripts/unixnu/bootimg.py
+index 259fb29..7065c78 100644
+--- a/scripts/unixnu/bootimg.py
++++ b/scripts/unixnu/bootimg.py
+@@ -104,6 +104,12 @@ def build(ctx, uefi, fd, dtb, ramdisk=None, output=None):
+             ramdisk_path = scratch / 'ramdisk'
+             ramdisk_path.write_bytes(b'')
+         command = ['python3', mkbootimg, '--kernel', kernel_path, '--ramdisk', ramdisk_path, '-o', out]
++        # header v2 needs a dtb argument (mkbootimg refuses an empty one); the same tree is
++        # appended to the kernel above, which is what ABL reads on these phones.
++        if int(image.get('header_version', 0)) > 1:
++            dtb_path = scratch / 'device.dtb'
++            dtb_path.write_bytes(tree)
++            command += ['--dtb', str(dtb_path)]
+         for key in MKBOOTIMG_FLAGS:
+             if key in image:
+                 command += [f'--{key}', str(image[key])]

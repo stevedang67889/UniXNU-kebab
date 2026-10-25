@@ -1,0 +1,65 @@
+diff --git a/DarwinBootPkg/Driver/DarwinBoot.c b/DarwinBootPkg/Driver/DarwinBoot.c
+index e2c5d91..d71cf21 100644
+--- a/DarwinBootPkg/Driver/DarwinBoot.c
++++ b/DarwinBootPkg/Driver/DarwinBoot.c
+@@ -422,9 +422,30 @@ AllocateWindow (KERNEL *Kernel, UINT64 WindowSize, EFI_PHYSICAL_ADDRESS *Address
+   Status = GetMap (&Map, &Capacity, &Size, &Key, &Stride);
+   if (EFI_ERROR (Status)) { if (Map != NULL) { FreePool (Map); } return Status; }
+   Status = EFI_OUT_OF_RESOURCES;
++  //
++  // Prefer the base of DRAM: the kernel runs at this physical address with the
++  // MMU off, and XNU's early mapping assumes it sits where the bootloader puts
++  // a normal kernel. The generic lowest-fit allocation lands in low SRAM-like
++  // memory (0x7D000 on this board) and the kernel faults during relocation.
++  //
++  {
++    STATIC CONST UINT64  Preferred[] = { 0x80000000ULL, 0x81000000ULL, 0x88000000ULL, 0x90000000ULL, 0xA0000000ULL };
++    UINTN                Index;
++    for (Index = 0; Index < ARRAY_SIZE (Preferred); Index++) {
++      Candidate = Preferred[Index] + (Kernel->Base & (BLOCK_SIZE - 1));
++      if (!EFI_ERROR (gBS->AllocatePages (AllocateAddress, EfiLoaderCode, EFI_SIZE_TO_PAGES (WindowSize), &Candidate))) {
++        *Address = Candidate;
++        FreePool (Map);
++        return EFI_SUCCESS;
++      }
++    }
++  }
+   for (Offset = 0; Offset + Stride <= Size; Offset += Stride) {
+     Descriptor = (EFI_MEMORY_DESCRIPTOR *)((UINT8 *)Map + Offset);
+     if ((Descriptor->Type != EfiConventionalMemory) || (Descriptor->NumberOfPages == 0)) { continue; }
++    // XNU must run from DRAM: skip the low controller/ATF memory so the first fit
++    // does not land at 0x7D000, where the early relocation loop faults.
++    if (Descriptor->PhysicalStart < 0x40000000ULL) { continue; }
+     End = RunEnd (Map, Size, Stride, Descriptor->PhysicalStart,
+                   Descriptor->PhysicalStart + EFI_PAGES_TO_SIZE (Descriptor->NumberOfPages));
+     RunBytes = End - Descriptor->PhysicalStart;
+@@ -668,6 +689,11 @@ Boot (
+   // screen first. This is what stays visible if the kernel never draws.
+   //
+   DEBUG ((DEBUG_ERROR, "\fDARWINBOOT: hand-off to the kernel\n\n"));
++  // clear the console so the boot log starts at the top
++  if (gST->ConOut != NULL && gST->ConOut->SetCursorPosition != NULL) {
++    gST->ConOut->SetCursorPosition (gST->ConOut, 0, 0);
++    gST->ConOut->OutputString (gST->ConOut, L"\n\n\n");
++  }
+   DEBUG ((DEBUG_ERROR, "kernel   va 0x%lx  pa 0x%lx\n", Kernel.Base, Address));
+   DEBUG ((DEBUG_ERROR, "entry    pa 0x%lx\n", Address + Kernel.Entry - Kernel.Base));
+   DEBUG ((DEBUG_ERROR, "args     pa 0x%lx  window 0x%lx bytes\n", ArgsAddress, (UINT64)WindowSize));
+@@ -682,14 +708,16 @@ Boot (
+           READ_SYSREG (id_aa64mmfr0_el1) & 0xF, (((READ_SYSREG (id_aa64mmfr0_el1) >> 28) & 0xF) == 0xF) ? "NOT supported" : "supported"));
+   DEBUG ((DEBUG_ERROR, "ID_AA64PFR0_EL1  0x%lx\n", READ_SYSREG (id_aa64pfr0_el1)));
+   DEBUG ((DEBUG_ERROR, "\nExiting boot services. A green bar across the top\nmarks the loader handoff before the kernel branch.\n"));
+-  for (Attempt = 0; Attempt < 3; Attempt++) {
++  for (Attempt = 0; Attempt < 16; Attempt++) {
+     MapSize = Capacity;
+     Status = gBS->GetMemoryMap (&MapSize, Map, &Key, &Stride, &Version);
+     if (EFI_ERROR (Status)) {
++      DEBUG ((DEBUG_ERROR, "DARWINBOOT: GetMemoryMap attempt %lu: %r\n", (UINT64)Attempt, Status));
+       if (Attempt == 0) { goto Fail; }
+       CpuDeadLoop ();
+     }
+     Status = gBS->ExitBootServices (mImage, Key);
++    DEBUG ((DEBUG_ERROR, "DARWINBOOT: ExitBootServices attempt %lu: %r\n", (UINT64)Attempt, Status));
+     if (!EFI_ERROR (Status)) {
+       DarwinEnter (ArgsAddress, Address + Kernel.Entry - Kernel.Base, Address, WindowSize, Video[0], Video[2] * Video[4]);
+       CpuDeadLoop ();
