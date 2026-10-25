@@ -1,4 +1,4 @@
-﻿# Sources of this device repository, resolved on top of UniXNU's own feeds.toml.
+# Sources of this device repository, resolved on top of UniXNU's own feeds.toml.
 # A device repository can supply any module kind; submodules under drivers/ are
 # picked up automatically, and shared SoC support is pinned here.
 
@@ -6,4 +6,4 @@
 name = "sm8250"
 kind = "soc"
 git = "https://github.com/stevedang67889/UniXNU-sm8250-common"
-commit = "8dd28b2dd16464fc327ff3bc32f6f84ad47df59d"
+commit = "f8d463f83d0efe76e8a5683ac95fc5f2e86d6f42"
