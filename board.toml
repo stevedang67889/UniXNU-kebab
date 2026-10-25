@@ -13,7 +13,7 @@ description = "OnePlus 8T"
 kit = "kebab"        # device package/ appears as kits/kebab
 
 [components]
-include = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "XnuPrelink", "DarwinBoot"]
+include = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "XnuPrelink", "DarwinBoot", "KebabRamDisk"]
 
 # Donor IPSW: the kernel is built from Apple's XNU source and prelinked against
 # this kernelcache, so the donor only has to match the XNU version and prelink
