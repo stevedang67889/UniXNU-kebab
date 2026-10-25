@@ -1,1 +1,4 @@
-﻿.DS_Storeout/local.toml*.log
+﻿.DS_Store
+out/
+local.toml
+*.log
