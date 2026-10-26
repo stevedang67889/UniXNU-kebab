@@ -16,10 +16,10 @@ index 259fb29..7065c78 100644
              if key in image:
                  command += [f'--{key}', str(image[key])]
 diff --git a/scripts/unixnu/devicetree.py b/scripts/unixnu/devicetree.py
-index cdf0f90..909a615 100644
+index cdf0f90..a465d27 100644
 --- a/scripts/unixnu/devicetree.py
 +++ b/scripts/unixnu/devicetree.py
-@@ -360,7 +360,78 @@ def generate(dtb, config, *, unique_chip_id=None, data=False, trust=False, addon
+@@ -360,7 +360,103 @@ def generate(dtb, config, *, unique_chip_id=None, data=False, trust=False, addon
                         ('#size-cells', struct.pack('<I', 2)), *typed_properties(platform.get('root', {}))]
      if not any(key == 'model' for key, _ in root_properties):
          root_properties.append(('model', root.properties['model']))
@@ -91,6 +91,31 @@ index cdf0f90..909a615 100644
 +            for key in ('name', 'interrupt-controller', 'virtual-timer-intid'):
 +                if key not in controller[3]:
 +                    controller[3].append(key)
++        # XNU reads redistributor-stride as one 32-bit cell; the device tree
++        # writes it as two cells and the encoder then produces eight bytes.
++        controller = next((kid for kid in arm_io[2] if kid[0] in ('intc', 'gic')), None)
++        if controller is not None and 'reg' in controller[1] and len(controller[1]['reg']) == 32:
++            # XNU maps the controller from these addresses without adding the
++            # window base back, so hand it absolute addresses. absolute GIC
++            # addresses: the encoder produced window offsets.
++            values = list(struct.unpack('<4Q', controller[1]['reg']))
++            values[0] += window_base
++            values[2] += window_base
++            controller[1]['reg'] = struct.pack('<4Q', *values)
++        if controller is not None and 'redistributor-stride' in controller[1]:
++            raw = controller[1]['redistributor-stride']
++            if len(raw) == 8:
++                # normalise the GIC stride to one cell
++                controller[1]['redistributor-stride'] = struct.pack('<I', struct.unpack('<Q', raw)[0] & 0xffffffff)
++        cpus = by_name.get('cpus')
++        if cpus is not None and cpus[2]:
++            total = len(cpus[2])
++            half = total // 2 or 1
++            for index, cpu in enumerate(cpus[2]):
++                cluster = 0 if index < half else 1
++                cpu[1]['die-cluster-id'] = struct.pack('<I', cluster)
++                if 'die-cluster-id' not in cpu[3]:
++                    cpu[3].append('die-cluster-id')
 +        if not any(kid[0] == 'timer' for kid in arm_io[2]):
 +            arm_io[2].append(('timer', {'name': b'timer\0', 'device_type': b'timer\0',
 +                                        'reg': struct.pack('<QQ', 0x17A00000 - window_base, 0x1000)},

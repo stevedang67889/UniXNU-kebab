@@ -294,3 +294,60 @@ panic log. Without them `ml_init_timebase` never runs and the kernel stops in
 The builder is patched rather than the payload: `docs/patches/unixnu-adt-nodes.patch`
 adds `_inject_xnu_nodes` to `scripts/unixnu/devicetree.py`, so every payload
 build produces the complete tree.
+## 2026-10-26: the kernel reaches the console initialisation
+
+The probe chain now walks the kernel one call at a time. Each step below is a
+device measurement: the patched kernel waits six seconds after the probe point
+and resets, so a reboot means the point was reached and a still screen means the
+hang is at or before it.
+
+| Probe point (in `_arm_init` unless stated) | Result |
+| --- | --- |
+| after the MMU enable | reboot |
+| after `arm_vm_init` | reboot |
+| after `kernel_startup_initialize_upto` | reboot |
+| inside the second `PE_init_platform` — after `pe_arm_init_interrupts` | still |
+| inside `pe_arm_init_interrupts` — before `ml_io_map` | still |
+| after `PE_create_console` | still |
+| after `PE_create_console`, with the function itself patched to `ret` | **reboot** |
+
+So the kernel gets through the early VM and the first platform initialisation and
+stops in `PE_create_console` → `ml_io_map_wcomb`, which maps the framebuffer for
+the text console. Replacing that function with a single `ret` (see
+`scripts/patch-func-ret.py`) lets the kernel continue, so the hang is confined to
+console creation and not to the boot path itself.
+
+### Two pitfalls that cost several builds
+
+- `_arm_init` calls `PE_init_platform` **twice**. A probe without
+  `entry_probe_reset_occurrence` patches the first call only, so "the probe after
+  `PE_init_platform` fired" and "the probe after the later call did not" are both
+  true. Set the occurrence when bisecting a function with several call sites.
+- The kernel clears the screen when it creates the console, so a black panel after
+  the stage bars is expected from that point on and does not mean the kernel died.
+
+### Device tree details XNU actually reads
+
+The generated ADT now carries, beyond the tagged hardware:
+
+| Property | Value | Why |
+| --- | --- | --- |
+| `arm-io/gic` `interrupt-controller` | `"master"` | `SecureDTFindEntry("interrupt-controller", "master")` |
+| `arm-io/gic` `reg` | GIC distributor and redistributor, four 64-bit cells | mapped by `pe_arm_init_interrupts` |
+| `arm-io/gic` `redistributor-stride` | one 32-bit cell (`0x20000`) | read as u32; an eight-byte property does not parse |
+| `arm-io/gic` `virtual-timer-intid` | 27 | virtual timer interrupt |
+| `arm-io/timer` | `device_type = timer`, `reg` inside the window | `pe_arm_map_interrupt_controller()` requires it |
+| `/pram` and `/chosen/embedded-panic-log-size` | 1 MiB at `0x17F00000` | panic log |
+| `cpus/cpu@N` `die-cluster-id` | 0 for the first four, 1 for the rest | topology |
+| `/chosen` `dram-base`, `dram-size`, `darwinboot-memory-size` | equal values | kernel window |
+
+The window is 4 GiB at `0x200000000` while the console hang is being cleared; the
+earlier 3 GiB window at `0xC0000000` behaved the same, so the size is not the
+cause.
+
+### Next
+
+1. Either restore a working console or keep the `ret` patch and continue the chain
+   from `PE_init_printf`.
+2. Add the kernel-side early console (the approach other Qualcomm ports use) so
+   kernel output stops depending on the panel geometry.

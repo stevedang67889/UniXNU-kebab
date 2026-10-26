@@ -75,3 +75,15 @@ Applies to `scripts/unixnu/` in the UniXNU base tree (with
 
    The region defaults to `0x17F00000`/1 MiB (inside the 3 GiB window at
    `0xC0000000`) and can be moved with a `[pram]` table in `board.toml`.
+## Skipping a kernel function at runtime
+
+`scripts/patch-func-ret.py` rewrites one function's first instruction to `ret` in
+a copy of the kernel:
+
+```sh
+python3 scripts/patch-func-ret.py <kernel.macho> _PE_create_console
+```
+
+Used while `PE_create_console` -> `ml_io_map_wcomb` hangs: with the function
+skipped the kernel continues, which separates a console problem from a boot-path
+problem. Pass `--output` to keep the original file.
