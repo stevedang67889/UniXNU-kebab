@@ -115,3 +115,13 @@ python3 scripts/porting-record.py check --device ../UniXNU-kebab
 [`AGENTS.md`](AGENTS.md) carries the build commands and the two firmware facts
 that are expensive to rediscover. [`docs/bring-up.md`](docs/bring-up.md) keeps
 the chronological measurements.
+Inputs that are not in any repository are named in
+[`proprietary-files.txt`](proprietary-files.txt); [`local.toml.example`](local.toml.example)
+shows the local paths a workstation needs.
+
+## Contributors
+
+| Contributor | Work |
+| --- | --- |
+| [stevedang67889](https://github.com/stevedang67889) | maintainer: hardware bring-up, firmware port, kernel build, testing on the KB2000 |
+| DeepSeek Harness (AI assistant) | firmware and loader patches, ADT node injection, the porting record and this documentation |

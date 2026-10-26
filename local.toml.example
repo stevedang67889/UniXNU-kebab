@@ -1,0 +1,26 @@
+# Copy to unixnu.local.toml in the UniXNU checkout (ignored by Git) to point the
+# build at local directories instead of fetching them. The command line
+# (--local, --local-drivers, --local-kits, --uefi, --kernel) takes precedence.
+#
+# A kebab workspace usually looks like this:
+#
+#   ~/unixnu/UniXNU                 the build driver
+#   ~/unixnu/UniXNU-kebab           this repository
+#   ~/unixnu/UniXNU-sm8250-common   the SoC feed
+#   ~/Mu-Silicium                   Mu-Silicium with Platforms/OnePlus/kebabPkg
+#   ~/kebabwork                     captured inputs (live.dtb, kernel.macho, ...)
+
+[local]
+# Component repositories (drivers/<Name> and kits/<Name> sources).
+drivers = "~/unixnu/drivers"
+kits = "~/unixnu/kits"
+
+[build]
+# UEFI tree for the firmware and payload steps. Overrides --uefi.
+uefi = "~/Mu-Silicium"
+
+[device]
+# Board name and the two host inputs that are not in any repository.
+device = "kebab"
+kernel = "~/kebabwork/kebab-kernel.macho"
+dtb = "~/kebabwork/live.dtb"
