@@ -57,3 +57,21 @@ if (!SKIP_ALL && (Index != SKIP_INDEX)) {
 ```
 
 Set `SKIP_ALL` to 0 to notify normally and bisect by index with `SKIP_INDEX`.
+## `unixnu-adt-nodes.patch`
+
+Applies to `scripts/unixnu/` in the UniXNU base tree (with
+`unixnu-bootimg-dtb.patch`). Two changes:
+
+1. `bootimg.py` passes `--dtb` for header version 2 images.
+2. `devicetree.py` gains `_inject_xnu_nodes`, which appends the nodes XNU looks
+   up but the tagged-node path does not produce:
+
+   | Node or property | Why XNU wants it |
+   | --- | --- |
+   | `arm-io/gic` `interrupt-controller = "master"` | `SecureDTFindEntry("interrupt-controller", "master")` finds the PIC by this string |
+   | `arm-io/timer` | `pe_arm_map_interrupt_controller()` needs a timer node, otherwise `ml_init_timebase` never runs |
+   | `gic` `virtual-timer-intid = 27` | the virtual timer INTID the GIC driver arms |
+   | `/pram` + `/chosen/embedded-panic-log-size` | the panic log region the kernel writes and the loader reads back |
+
+   The region defaults to `0x17F00000`/1 MiB (inside the 3 GiB window at
+   `0xC0000000`) and can be moved with a `[pram]` table in `board.toml`.

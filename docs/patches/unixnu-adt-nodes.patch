@@ -1,0 +1,101 @@
+diff --git a/scripts/unixnu/bootimg.py b/scripts/unixnu/bootimg.py
+index 259fb29..7065c78 100644
+--- a/scripts/unixnu/bootimg.py
++++ b/scripts/unixnu/bootimg.py
+@@ -104,6 +104,12 @@ def build(ctx, uefi, fd, dtb, ramdisk=None, output=None):
+             ramdisk_path = scratch / 'ramdisk'
+             ramdisk_path.write_bytes(b'')
+         command = ['python3', mkbootimg, '--kernel', kernel_path, '--ramdisk', ramdisk_path, '-o', out]
++        # header v2 needs a dtb argument (mkbootimg refuses an empty one); the same tree is
++        # appended to the kernel above, which is what ABL reads on these phones.
++        if int(image.get('header_version', 0)) > 1:
++            dtb_path = scratch / 'device.dtb'
++            dtb_path.write_bytes(tree)
++            command += ['--dtb', str(dtb_path)]
+         for key in MKBOOTIMG_FLAGS:
+             if key in image:
+                 command += [f'--{key}', str(image[key])]
+diff --git a/scripts/unixnu/devicetree.py b/scripts/unixnu/devicetree.py
+index cdf0f90..909a615 100644
+--- a/scripts/unixnu/devicetree.py
++++ b/scripts/unixnu/devicetree.py
+@@ -360,7 +360,78 @@ def generate(dtb, config, *, unique_chip_id=None, data=False, trust=False, addon
+                        ('#size-cells', struct.pack('<I', 2)), *typed_properties(platform.get('root', {}))]
+     if not any(key == 'model' for key, _ in root_properties):
+         root_properties.append(('model', root.properties['model']))
+-    return node('device-tree', root_properties, children)
++    platform_pram = platform.get('pram', {})
++    pram_base = int(platform_pram.get('base', 0x17F00000))
++    pram_size = int(platform_pram.get('size', 0x100000))
++    return _inject_xnu_nodes(node('device-tree', root_properties, children), pram_base, pram_size)
++
++
++def _adt_walk(blob, offset):
++    """Parse one ADT node: returns (name, props, children, order, next offset)."""
++    count, children = struct.unpack_from('<II', blob, offset)
++    offset += 8
++    props, order = {}, []
++    for _ in range(count):
++        raw = blob[offset:offset + 32]
++        length, = struct.unpack_from('<I', blob, offset + 32)
++        key = raw.split(b'\0')[0].decode()
++        props[key] = blob[offset + 36:offset + 36 + length]
++        order.append(key)
++        offset += 36 + length + (-length % 4)
++    kids = []
++    for _ in range(children):
++        kid, offset = _adt_walk(blob, offset)
++        kids.append(kid)
++    return (props.get('name', b'\0').split(b'\0')[0].decode(), props, kids, order), offset
++
++
++def _adt_encode(node):
++    _, props, kids, order = node
++    body = struct.pack('<II', len(order), len(kids))
++    for key in order:
++        data = props[key]
++        body += struct.pack('<32sI', key.encode(), len(data))
++        body += data + bytes(-len(data) % 4)
++    return body + b''.join(_adt_encode(kid) for kid in kids)
++
++
++def _inject_xnu_nodes(blob, pram_base, pram_size):
++    """Add the nodes XNU looks up but the tagged-node path does not produce.
++
++    XNU finds the interrupt controller with SecureDTFindEntry(
++    "interrupt-controller", "master") and pe_arm_map_interrupt_controller()
++    also wants a timer node, otherwise ml_init_timebase never runs. The panic
++    log region needs /pram and /chosen/embedded-panic-log-size.
++    """
++    root, _ = _adt_walk(blob, 0)
++    _, props, kids, order = root
++    by_name = {kid[0]: kid for kid in kids}
++    chosen = by_name.get('chosen')
++    if chosen is None:
++        return blob
++    chosen[1]['embedded-panic-log-size'] = struct.pack('<I', pram_size)
++    if 'embedded-panic-log-size' not in chosen[3]:
++        chosen[3].append('embedded-panic-log-size')
++    if 'pram' not in by_name:
++        kids.append({'pram': 0} and ('pram', {'name': b'pram\0', 'reg': struct.pack('<QQ', pram_base, pram_size)},
++                                     [], ['name', 'reg']))
++    arm_io = by_name.get('arm-io')
++    if arm_io is not None:
++        ranges = arm_io[1].get('ranges')
++        window_base = struct.unpack_from('<Q', ranges, 8)[0] if ranges else 0x17000000
++        controller = next((kid for kid in arm_io[2] if kid[0] in ('intc', 'gic')), None)
++        if controller is not None:
++            controller[1]['name'] = b'gic\0'
++            controller[1]['interrupt-controller'] = b'master\0'
++            controller[1]['virtual-timer-intid'] = struct.pack('<I', 27)
++            for key in ('name', 'interrupt-controller', 'virtual-timer-intid'):
++                if key not in controller[3]:
++                    controller[3].append(key)
++        if not any(kid[0] == 'timer' for kid in arm_io[2]):
++            arm_io[2].append(('timer', {'name': b'timer\0', 'device_type': b'timer\0',
++                                        'reg': struct.pack('<QQ', 0x17A00000 - window_base, 0x1000)},
++                              [], ['name', 'device_type', 'reg']))
++    return _adt_encode(root)
+ 
+ 
+ def compile_hardware(ctx):

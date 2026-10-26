@@ -275,3 +275,22 @@ arm-io  ranges = base 0x17000000 size 0x1000000
 Registers are emitted as offsets from the `arm-io` window, so `0xa0000` resolves
 to the GIC distributor at `0x17a00000` and `0xa60000` to the redistributor at
 `0x17a60000`. Add `unixnu,adt-name` to any further node the kernel has to see.
+## XNU's device tree lookups
+
+`arm-io/intc` alone was not enough. The ports that reach userspace name the
+interrupt controller by property, not by node name:
+
+```c
+SecureDTFindEntry("interrupt-controller", "master")   /* finds the PIC */
+pe_arm_map_interrupt_controller()                     /* also wants a timer node */
+```
+
+So the generated ADT now carries `arm-io/gic` with
+`interrupt-controller = "master"`, `virtual-timer-intid = 27`, an
+`arm-io/timer` node, and `/pram` plus `/chosen/embedded-panic-log-size` for the
+panic log. Without them `ml_init_timebase` never runs and the kernel stops in
+`_machine_conf` before it can print anything.
+
+The builder is patched rather than the payload: `docs/patches/unixnu-adt-nodes.patch`
+adds `_inject_xnu_nodes` to `scripts/unixnu/devicetree.py`, so every payload
+build produces the complete tree.
