@@ -23,6 +23,11 @@ kind = "source"
 reference = "board.toml"
 result = "Format 2 board description with the SM8250 SoC feed and the five components above."
 
+[[area.evidence]]
+kind = "source"
+reference = "porting.toml"
+result = "Thirteen areas with measured facts; python3 scripts/porting-record.py check --device ../UniXNU-kebab passes."
+
 [[area]]
 id = "firmware"
 status = "device-verified"
