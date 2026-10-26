@@ -2,11 +2,25 @@
 
 UniXNU device repository for the **OnePlus 8T (kebab, Qualcomm SM8250)**.
 
-Status: **UEFI bring-up done on hardware (2026-10-24)**. Mu-Silicium boots on a
-KB2000 (12+256, ColorOS 14, unlocked): the UniXNU boot menu is displayed, the
-power and volume keys work, and the firmware log is readable on the panel. UFS
-block storage is the remaining blocker; the kernel, ADT and payload volume are
-built and waiting for it.
+## Status (2026-10-26)
+
+Tested on a KB2000 (12+256, ColorOS 14, unlocked).
+
+| Stage | State |
+| --- | --- |
+| Mu-Silicium UEFI from `boot_a` | working, panel log readable, keys work |
+| UniXNU menu from the payload volume | working (`KebabRamDisk` publishes the FDF region as BlockIo) |
+| DarwinBoot: validate, load, exit boot services | working once the exit-boot-services notifications are skipped (see `docs/patches/mu-basecore-kebab.patch`) |
+| XNU entry and MMU enable | working (entry bar, then the six-second reset probe fires) |
+| `_machine_startup` | working |
+| **`_machine_conf`** | **current blocker** — hangs at or before its first call, `_ml_get_topology_info` |
+
+Two things were needed to get the kernel this far: a 3 GiB DRAM window that
+DarwinBoot loads the kernel into (`dram-base`, `dram-size` and
+`darwinboot-memory-size` all `0xC0000000`), and the device tree nodes XNU looks
+up by property (`arm-io/gic` with `interrupt-controller = "master"`, a timer
+node, `virtual-timer-intid`, `/pram`). See `docs/bring-up.md` for the measured
+chain and the probe procedure.
 
 ## Layout
 
