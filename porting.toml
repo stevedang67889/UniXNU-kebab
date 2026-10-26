@@ -10,7 +10,7 @@ summary = "OnePlus 8T (KB2000). Firmware, menu and payload volume work; the kern
 id = "configuration"
 status = "implemented"
 components = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "XnuPrelink", "DarwinBoot"]
-paths = ["board.toml", "feeds.toml", "configs/**", "dts/**", "docs/**"]
+paths = ["board.toml", "feeds.toml", "porting.toml", "AGENTS.md", "README.md", "configs/**", "dts/**", "docs/**", ".github/**", ".gitmodules", ".gitignore", ".gitattributes"]
 inputs = ["UniXNU format 2 device repository", "UniXNU-sm8250-common SoC feed pinned in feeds.toml", "iPad7,1 17.7.11 21H461 donor IPSW"]
 configuration = ["board.toml schema_version = 2", "components include ArmDTPlatform, ArmCpu, SoftwareAES, XnuPrelink and DarwinBoot", "kernel.prelink slide -0x1000000 against kernelcache f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7", "kernel archives add build-arm-driver.py ArmDTPlatform and ArmCpu"]
 procedure = ["Clone UniXNU, UniXNU-kebab and UniXNU-sm8250-common as siblings", "Run ./unixnu fetch and ./unixnu defconfig kebab_defconfig", "./unixnu status --json reports the resolved pins"]
