@@ -102,3 +102,16 @@ flash to `boot_a` instead and reboot.
 ## License
 
 BSD-2-Clause-Patent, matching UniXNU and Mu-Silicium.
+## Porting record
+
+[`porting.toml`](porting.toml) is the authoritative record: thirteen areas with
+the measured facts, completion level and evidence for each. Read it before
+changing the port, and update the affected area with every change:
+
+```sh
+python3 scripts/porting-record.py check --device ../UniXNU-kebab
+```
+
+[`AGENTS.md`](AGENTS.md) carries the build commands and the two firmware facts
+that are expensive to rediscover. [`docs/bring-up.md`](docs/bring-up.md) keeps
+the chronological measurements.
