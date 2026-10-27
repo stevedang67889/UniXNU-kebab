@@ -4,7 +4,7 @@ schema_version = 1
 name = "kebab"
 soc = "SM8250"
 os_profile = "ipados-17.7.11-21H461"
-summary = "OnePlus 8T (KB2000). Firmware, menu and payload volume work. The kernel enters, enables the MMU, completes arm_vm_init, kernel_startup_initialize_upto and the first PE_init_platform, and stops in PE_create_console inside ml_io_map_wcomb; replacing that function with a ret lets it continue."
+summary = "OnePlus 8T (KB2000). Firmware, menu and payload volume work. The kernel runs the whole of kernel_bootstrap, starts the scheduler and its first thread, and enters bsd_init, where platform_stall_panic_or_spin parks on a wfe loop."
 
 [[area]]
 id = "configuration"
@@ -55,7 +55,7 @@ paths = ["dts/kebab.dts", "scripts/patch-func-ret.py", "docs/bring-up.md"]
 inputs = ["Eight cores at MPIDR affinities 0x000 through 0x700", "PSCI method smc", "19.2 MHz timebase"]
 configuration = ["cpus node with one cpu per affinity and state running/waiting", "timebase-frequency 0x124f800", "arm-io/gic interrupt-controller master, virtual-timer-intid 27"]
 procedure = ["Install the kernel entry probe with entry_probe_reset_delay and a symbol to bisect", "Read the stage bars: blue is kernel entry with the MMU off, magenta is just before the MMU is on", "A reboot six seconds after the bars proves the probe point was reached"]
-findings = ["The kernel is entered and enables the MMU once ExitBootServices is allowed to finish; the timed reset after the MMU enable proves it.", "Probe chain in _arm_init: arm_vm_init, kernel_startup_initialize_upto and the first PE_init_platform all return. The kernel stops in PE_create_console, inside ml_io_map_wcomb.", "Replacing PE_create_console with a single ret (scripts/patch-func-ret.py) lets the kernel continue, so the boot path is sound and only console creation hangs.", "_arm_init calls PE_init_platform twice, so a probe without entry_probe_reset_occurrence patches the first call only; this made earlier readings look contradictory.", "The kernel clears the screen when it creates the console, so a black panel after the stage bars does not mean the kernel died."]
+findings = ["The kernel is entered and enables the MMU once ExitBootServices is allowed to finish; the timed reset after the MMU enable proves it.", "With PE_create_console replaced by a ret, the kernel completes PE_init_printf, PE_init_cpu, machine_conf, vm_mem_bootstrap, console_init, sched_init and kernel_thread_create, and reaches the bootstrap thread with its first context switch.", "_machine_startup is four instructions and tail-branches into _kernel_bootstrap, so a probe placed after that call can never fire; earlier readings of it measured nothing.", "_arm_init calls PE_init_platform twice and kernel_startup_initialize_upto is called once per init stage, so a probe needs entry_probe_reset_occurrence when the call appears more than once.", "The kernel clears the screen when it creates the console, so a black panel after the stage bars does not mean the kernel died."]
 completion = ["Every enabled CPU reaches its entry checkpoint and timer and IPI handling works on each enabled CPU."]
 limits = ["Only the boot CPU runs; secondary cores are not started and _machine_conf does not complete."]
 next_action = ["Add the missing device tree details _machine_conf reads, then repeat the reset probe at _ml_get_topology_info and _cpu_machine_init."]

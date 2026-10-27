@@ -12,8 +12,10 @@ Tested on a KB2000 (12+256, ColorOS 14, unlocked).
 | UniXNU menu from the payload volume | working (`KebabRamDisk` publishes the FDF region as BlockIo) |
 | DarwinBoot: validate, load, exit boot services | working once the exit-boot-services notifications are skipped (see `docs/patches/mu-basecore-kebab.patch`) |
 | XNU entry and MMU enable | working (entry bar, then the six-second reset probe fires) |
-| `_machine_startup` | working |
-| **`_machine_conf`** | **current blocker** — hangs at or before its first call, `_ml_get_topology_info` |
+| `_machine_startup` → `_kernel_bootstrap` | working (a tail call, so nothing follows it) |
+| `kernel_bootstrap` up to `_bsd_init` | working once `PE_create_console` is replaced by a `ret` (`scripts/patch-func-ret.py`) |
+| Scheduler start, bootstrap thread, core services | working (the reset probe still fires after the first context switch) |
+| **`_bsd_init`** | **current blocker** — `platform_stall_panic_or_spin(4)` parks on a `wfe` loop before `throttle_init` |
 
 Two things were needed to get the kernel this far: a 3 GiB DRAM window that
 DarwinBoot loads the kernel into (`dram-base`, `dram-size` and

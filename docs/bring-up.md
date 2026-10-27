@@ -351,3 +351,59 @@ cause.
    from `PE_init_printf`.
 2. Add the kernel-side early console (the approach other Qualcomm ports use) so
    kernel output stops depending on the panel geometry.
+## 2026-10-27: the kernel reaches the BSD layer
+
+Continuing the same probe method, with one new tool: `scripts/patch-func-ret.py`
+rewrites a single kernel function to `ret`, so a call that hangs can be skipped
+without a console and without rebuilding the kernel.
+
+### The chain, measured
+
+| Point | Result |
+| --- | --- |
+| `PE_create_console` replaced by `ret` | kernel continues (reboot at the next probe) |
+| `PE_init_printf`, `PE_init_cpu` | reboot |
+| `_machine_conf` | reboot |
+| `_vm_mem_bootstrap`, `_console_init`, `_sched_init` | reboot |
+| `_kernel_thread_create` (first context switch follows) | reboot |
+| `_device_service_create` | reboot |
+| `_bootprofile_init`, second `_kernel_startup_initialize_upto` | reboot |
+| any call inside `_bsd_init` | still |
+
+So the kernel finishes the whole of `kernel_bootstrap` and enters `bsd_init`.
+
+### Why the `_machine_startup` probe could never work
+
+```
+_machine_startup:
+    bl  _machine_conf
+    b   _kernel_bootstrap      ; tail call, no return
+```
+
+`_machine_startup` is four instructions and then branches into
+`_kernel_bootstrap`, so a probe placed after that call is unreachable. Earlier
+readings that treated `_machine_startup` as "returned or not" were measuring
+nothing.
+
+### The current stop: a `wfe` stall, not a fault
+
+`_bsd_init` begins with `_platform_stall_panic_or_spin(4)`. That function tests a
+platform stall mask; when the bit is set it appends one panic log record and then
+loops on `wfe` forever:
+
+```
+ldr  x8, [stall mask]
+tst  x8, x9
+b.eq return
+paniclog_append_noflush("...")
+wfe
+b    -4
+```
+
+The screen simply stops, which is exactly what was recorded. Every "stuck in
+`_bsd_init`" reading is this single loop at the entry, which is also why skipping
+`throttle_init` changed nothing: the stall happens before it.
+
+Next: find what sets that mask bit (panic log availability is the first
+candidate, i.e. the `pram` node and `/chosen/embedded-panic-log-size`), or skip
+the stall function with the ret tool and see whether BSD initialisation proceeds.
