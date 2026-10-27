@@ -4,7 +4,7 @@ schema_version = 1
 name = "kebab"
 soc = "SM8250"
 os_profile = "ipados-17.7.11-21H461"
-summary = "OnePlus 8T (KB2000). Firmware, menu and payload volume work; the kernel enters, enables the MMU and reaches _machine_startup, and stops in _machine_conf."
+summary = "OnePlus 8T (KB2000). Firmware, menu and payload volume work. The kernel enters, enables the MMU, completes arm_vm_init, kernel_startup_initialize_upto and the first PE_init_platform, and stops in PE_create_console inside ml_io_map_wcomb; replacing that function with a ret lets it continue."
 
 [[area]]
 id = "configuration"
@@ -14,7 +14,7 @@ paths = ["board.toml", "feeds.toml", "porting.toml", "proprietary-files.txt", "l
 inputs = ["UniXNU format 2 device repository", "UniXNU-sm8250-common SoC feed pinned in feeds.toml", "iPad7,1 17.7.11 21H461 donor IPSW"]
 configuration = ["board.toml schema_version = 2", "components include ArmDTPlatform, ArmCpu, SoftwareAES, XnuPrelink and DarwinBoot", "kernel.prelink slide -0x1000000 against kernelcache f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7", "kernel archives add build-arm-driver.py ArmDTPlatform and ArmCpu"]
 procedure = ["Clone UniXNU, UniXNU-kebab and UniXNU-sm8250-common as siblings", "Run ./unixnu fetch and ./unixnu defconfig kebab_defconfig", "./unixnu status --json reports the resolved pins"]
-findings = ["The format 2 builder exports an arm-io child only for device tree nodes that carry a unixnu,adt-name property, so an untagged tree yields an empty arm-io and the kernel has no interrupt controller.", "The boot image has to use the phone own device tree; the tree shipped with Mu-Silicium lacks cont_splash_region@9c000000 and ABL then keeps the panel dark.", "Two inputs are not in any repository and must be captured per handset: the live device tree from /sys/firmware/fdt and the kernel built on a macOS runner. proprietary-files.txt names both with their hashes and consumers.", "Every change to a file an area owns has to update that area findings or evidence in the same commit; the catalog workflow fails otherwise and names the path."]
+findings = ["The format 2 builder exports an arm-io child only for device tree nodes that carry a unixnu,adt-name property, so an untagged tree yields an empty arm-io and the kernel has no interrupt controller.", "The boot image has to use the phone own device tree; the tree shipped with Mu-Silicium lacks cont_splash_region@9c000000 and ABL then keeps the panel dark.", "Two inputs are not in any repository and must be captured per handset: the live device tree from /sys/firmware/fdt and the kernel built on a macOS runner. proprietary-files.txt names both with their hashes and consumers.", "Every change to a file an area owns has to update that area findings or evidence in the same commit; the catalog workflow fails otherwise and names the path.", "The device summary is what the generated page shows first, so it has to name the current stage rather than the first blocker found."]
 completion = ["Every source pin resolves and the selected components have records; unixnu status reports the intended overrides."]
 limits = ["No device-side repository record was published before this file; the entries below are the first complete record."]
 next_action = ["Keep the record current as firmware and kernel patches land."]
