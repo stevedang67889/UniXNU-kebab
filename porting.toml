@@ -216,13 +216,13 @@ result = "The image boots to the menu, the payload volume mounts and the kernel 
 id = "diagnostics"
 status = "device-verified"
 components = ["DarwinBoot"]
-paths = ["docs/bring-up.md", "docs/patches/**"]
+paths = ["docs/bring-up.md", "docs/log-capture.md", "docs/patches/**"]
 inputs = ["Panel as the only output", "kernel entry probe and timed reset from patch-xnu-entry-probe.py"]
 configuration = ["DEBUG output routed to the framebuffer console", "entry_probe_reset_delay with entry_probe_reset_after and entry_probe_reset_in selects the bisect point"]
 procedure = ["Build the payload with the probe, flash, boot and read the panel", "A reboot after the delay means the probe point was reached"]
-findings = ["Stage bars mark kernel entry and the point just before the MMU is on; a timed reset is the only signal available once the kernel runs without a console.", "A probe registered after the exit-boot-services notifications proved those notifications never returned; skipping them made the hand-off complete.", "Probes can mislead: an inline-assembly probe hardcoded to an identity mapping crashes after arm_vm_init closes that mapping and looks like a kernel hang."]
+findings = ["Stage bars mark kernel entry and the point just before the MMU is on; a timed reset is the only signal available once the kernel runs without a console.", "A probe registered after the exit-boot-services notifications proved those notifications never returned; skipping them made the hand-off complete.", "Probes can mislead: an inline-assembly probe hardcoded to an identity mapping crashes after arm_vm_init closes that mapping and looks like a kernel hang.", "A checkpoint ring at 0xB9000000 keeps probe results in RAM across a warm reset, and the KebabBootLog DXE driver prints them on the next boot; the reader is verified on the device, the kernel-side writer is not written yet."]
 completion = ["A failed boot leaves enough on the panel or over a transport to identify the failed stage."]
-limits = ["No USB or storage log transport; every observation needs a photograph of the panel."]
+limits = ["No USB or storage log transport yet; the RAM ring only survives a warm reset and only the firmware can read it."]
 next_action = ["Add a log transport or copy the panic log into /pram once the kernel panics with a console available."]
 [[area.evidence]]
 kind = "device"

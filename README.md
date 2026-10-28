@@ -15,7 +15,7 @@ Tested on a KB2000 (12+256, ColorOS 14, unlocked).
 | `_machine_startup` → `_kernel_bootstrap` | working (a tail call, so nothing follows it) |
 | `kernel_bootstrap` up to `_bsd_init` | working once `PE_create_console` is replaced by a `ret` (`scripts/patch-func-ret.py`) |
 | Scheduler start, bootstrap thread, core services | working (the reset probe still fires after the first context switch) |
-| **`_bsd_init`** | **current blocker** — `platform_stall_panic_or_spin(4)` parks on a `wfe` loop before `throttle_init` |
+| **`_bsd_init`** | **current blocker** — a wait inside BSD initialisation that neither a `ret` on `kperf_init_early` nor `ml_wait_max_cpus` clears |
 
 Two things were needed to get the kernel this far: a 3 GiB DRAM window that
 DarwinBoot loads the kernel into (`dram-base`, `dram-size` and
