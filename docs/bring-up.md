@@ -407,3 +407,30 @@ The screen simply stops, which is exactly what was recorded. Every "stuck in
 Next: find what sets that mask bit (panic log availability is the first
 candidate, i.e. the `pram` node and `/chosen/embedded-panic-log-size`), or skip
 the stall function with the ret tool and see whether BSD initialisation proceeds.
+## 2026-10-28: 32 checkpoints in one page
+
+The reset probe answers one question per flash. The five blind rets
+(`PE_init_iokit`, `kperf_init_early`, `ml_wait_max_cpus`,
+`platform_stall_panic_or_spin`, `initialize_screen`) move the stop but do not
+name it, so the next image carries all 32 questions at once.
+
+`scripts/patch-xnu-log-probe.py` replaces 32 `bl` call sites in
+`_kernel_bootstrap_thread` and `_bsd_init` with a stub that saves x0-x8 and LR,
+writes one flag byte and tail-calls the original callee. The return address and
+the argument registers are restored before the tail call, so the callee sees the
+original call state. The stubs sit in the zero padding at the end of
+`__TEXT_EXEC`, so the Mach-O layout and load address stay the same.
+
+The probe writes `0xB9000010 + id` through `ml_phys_write_byte`. XNU closes its
+identity map in `arm_vm_init`; the measured 3 GiB build loads the kernel at
+physical `0xC007C000`, and the 4 GiB test window can only place it higher, so the
+ring is below `gPhysBase` and outside managed memory. `ml_phys_write_byte` maps
+the page through the uncached CPU copy window, writes it and unmaps, so the byte
+reaches DRAM without a cache clean. `KebabBootLog` reads the verified ring
+address, prints the set bytes and `last`/`next`, and clears the flags. The 8 MiB
+ring header at `0xB9000000` remains reserved; stage 2 can add records at
+`0xB9000010` when it replaces the flags.
+
+The checkpoint table is in [`log-capture.md`](log-capture.md). The image built
+for the next run is `out/logprobe-boot.img`; the device result is the next
+measurement.

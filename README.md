@@ -2,7 +2,7 @@
 
 UniXNU device repository for the **OnePlus 8T (kebab, Qualcomm SM8250)**.
 
-## Status (2026-10-26)
+## Status (2026-10-28)
 
 Tested on a KB2000 (12+256, ColorOS 14, unlocked).
 
@@ -15,14 +15,14 @@ Tested on a KB2000 (12+256, ColorOS 14, unlocked).
 | `_machine_startup` → `_kernel_bootstrap` | working (a tail call, so nothing follows it) |
 | `kernel_bootstrap` up to `_bsd_init` | working once `PE_create_console` is replaced by a `ret` (`scripts/patch-func-ret.py`) |
 | Scheduler start, bootstrap thread, core services | working (the reset probe still fires after the first context switch) |
-| **`_bsd_init`** | **current blocker** — a wait inside BSD initialisation that neither a `ret` on `kperf_init_early` nor `ml_wait_max_cpus` clears |
+| `PE_init_iokit` → `_bsd_init` | **current blocker** — with `PE_init_iokit`, `initialize_screen`, `kperf_init_early`, `ml_wait_max_cpus` and `platform_stall_panic_or_spin` skipped, the kernel stops in this gap; `scripts/patch-xnu-log-probe.py` puts 32 checkpoints in one boot |
 
 Two things were needed to get the kernel this far: a 3 GiB DRAM window that
 DarwinBoot loads the kernel into (`dram-base`, `dram-size` and
 `darwinboot-memory-size` all `0xC0000000`), and the device tree nodes XNU looks
 up by property (`arm-io/gic` with `interrupt-controller = "master"`, a timer
 node, `virtual-timer-intid`, `/pram`). See `docs/bring-up.md` for the measured
-chain and the probe procedure.
+chain and `docs/log-capture.md` for the 32-checkpoint flag capture.
 
 ## Layout
 

@@ -13,46 +13,29 @@ index 4d208553..3bc899a2 100644
    .quad 0               /* Reserved */
 diff --git a/Platforms/OnePlus/kebabPkg/Driver/KebabBootLog/KebabBootLog.c b/Platforms/OnePlus/kebabPkg/Driver/KebabBootLog/KebabBootLog.c
 new file mode 100644
-index 00000000..afc12bf7
+index 00000000..a03598c2
 --- /dev/null
 +++ b/Platforms/OnePlus/kebabPkg/Driver/KebabBootLog/KebabBootLog.c
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,90 @@
 +/** @file
-+  Reads the checkpoint ring that the kernel probe stubs leave in RAM.
++  Reads the stage-1 checkpoint flags that the kernel probe stubs leave in RAM.
 +
-+  The ring lives at a fixed physical address outside the kernel window, so a
-+  warm reset keeps it. A stub writes one record per checkpoint; this driver runs
-+  before the payload is loaded, prints what it finds, and clears the magic so a
-+  later boot without a kernel run reports nothing instead of stale records.
++  Each checkpoint writes one byte at 0xB9000010 + id through
++  ml_phys_write_byte, waits for the write to reach memory and continues. This
++  driver runs before the payload is loaded, prints which bytes are set, clears
++  them and holds the panel so the result can be photographed. A warm reset
++  keeps DRAM, which is what makes the hand-over work.
 +**/
 +
 +#include <Uefi.h>
 +#include <Library/BaseLib.h>
 +#include <Library/BaseMemoryLib.h>
++#include <Library/CacheMaintenanceLib.h>
 +#include <Library/DebugLib.h>
 +#include <Library/UefiBootServicesTableLib.h>
 +
-+#define KEBAB_BOOTLOG_BASE      0xB9000000ULL
-+#define KEBAB_BOOTLOG_SIZE      0x00800000ULL
-+#define KEBAB_BOOTLOG_MAGIC     0x474C424B
-+#define KEBAB_BOOTLOG_VERSION   1
-+
-+typedef struct {
-+  UINT32  Magic;
-+  UINT32  Version;
-+  UINT32  Count;
-+  UINT32  Dropped;
-+} KEBAB_BOOTLOG_HEADER;
-+
-+typedef struct {
-+  UINT64  Sequence;
-+  UINT64  Checkpoint;
-+  UINT64  Value;
-+  UINT64  Counter;
-+} KEBAB_BOOTLOG_RECORD;
-+
-+#define KEBAB_BOOTLOG_CAPACITY \
-+  ((KEBAB_BOOTLOG_SIZE - sizeof (KEBAB_BOOTLOG_HEADER)) / sizeof (KEBAB_BOOTLOG_RECORD))
++#define KEBAB_PROBE_BASE   0xB9000010ULL
++#define KEBAB_PROBE_COUNT  32
 +
 +EFI_STATUS
 +EFIAPI
@@ -61,53 +44,78 @@ index 00000000..afc12bf7
 +  IN EFI_SYSTEM_TABLE  *SystemTable
 +  )
 +{
-+  volatile KEBAB_BOOTLOG_HEADER  *Header;
-+  volatile KEBAB_BOOTLOG_RECORD  *Records;
-+  UINT32                         Count;
-+  UINT32                         Index;
++  volatile UINT8  *Flags;
++  UINT32          Index;
++  UINT32          Last;
++  BOOLEAN         Any;
 +
-+  Header  = (volatile KEBAB_BOOTLOG_HEADER *)(UINTN)KEBAB_BOOTLOG_BASE;
-+  Records = (volatile KEBAB_BOOTLOG_RECORD *)(UINTN)(KEBAB_BOOTLOG_BASE + sizeof (KEBAB_BOOTLOG_HEADER));
++  Flags = (volatile UINT8 *)(UINTN)KEBAB_PROBE_BASE;
 +
 +  DEBUG ((DEBUG_ERROR, "\n================ KEBAB BOOTLOG ================\n"));
-+  DEBUG ((DEBUG_ERROR, "BOOTLOG base=%lx magic=%08x version=%u count=%u dropped=%u\n",
-+          (UINT64)KEBAB_BOOTLOG_BASE, Header->Magic, Header->Version,
-+          Header->Count, Header->Dropped));
-+  DEBUG ((DEBUG_ERROR, "===============================================\n"));
++  DEBUG ((DEBUG_ERROR, "BOOTLOG probe base=%lx count=%u\n",
++          (UINT64)KEBAB_PROBE_BASE, KEBAB_PROBE_COUNT));
 +
-+  if (Header->Magic != KEBAB_BOOTLOG_MAGIC) {
-+    DEBUG ((DEBUG_ERROR, "BOOTLOG no records; holding the panel for five seconds\n"));
-+    gBS->Stall (5000000);
-+    return EFI_SUCCESS;
++  InvalidateDataCacheRange ((VOID *)(UINTN)KEBAB_PROBE_BASE, KEBAB_PROBE_COUNT);
++
++  Any  = FALSE;
++  Last = 0;
++  for (Index = 0; Index < KEBAB_PROBE_COUNT; Index++) {
++    if (Flags[Index] != 0) {
++      Any  = TRUE;
++      Last = Index;
++    }
 +  }
 +
-+  Count = Header->Count;
-+  if (Count > KEBAB_BOOTLOG_CAPACITY) {
-+    Count = KEBAB_BOOTLOG_CAPACITY;
++  //
++  // A valid capture is a prefix: the kernel writes the flags in execution
++  // order, so a set byte after a clear byte, or a clear byte 0, is stale or
++  // random data, not this boot's checkpoint log.
++  //
++  if (Any && (Flags[0] != 1)) {
++    Any = FALSE;
++  }
++  if (Any) {
++    for (Index = 1; Index <= Last; Index++) {
++      if (Flags[Index] == 0) {
++        Any = FALSE;
++        break;
++      }
++    }
 +  }
 +
-+  DEBUG ((DEBUG_ERROR, "BOOTLOG records=%u of %u capacity\n", Count, (UINT32)KEBAB_BOOTLOG_CAPACITY));
-+  for (Index = 0; Index < Count; Index++) {
-+    DEBUG ((DEBUG_ERROR, "BOOTLOG %u cp=%lx value=%lx t=%lu\n",
++  for (Index = 0; Index < KEBAB_PROBE_COUNT; Index += 8) {
++    DEBUG ((DEBUG_ERROR, "BOOTLOG %02u: %02x %02x %02x %02x %02x %02x %02x %02x\n",
 +            Index,
-+            Records[Index].Checkpoint,
-+            Records[Index].Value,
-+            Records[Index].Counter));
++            Flags[Index + 0], Flags[Index + 1], Flags[Index + 2], Flags[Index + 3],
++            Flags[Index + 4], Flags[Index + 5], Flags[Index + 6], Flags[Index + 7]));
 +  }
 +
-+  Header->Magic = 0;
++  if (Any) {
++    DEBUG ((DEBUG_ERROR, "BOOTLOG set:"));
++    for (Index = 0; Index < KEBAB_PROBE_COUNT; Index++) {
++      if (Flags[Index] != 0) {
++        DEBUG ((DEBUG_ERROR, " %u", Index));
++      }
++    }
++    DEBUG ((DEBUG_ERROR, "\nBOOTLOG last=%u next=%u\n", Last, Last + 1));
++  } else {
++    DEBUG ((DEBUG_ERROR, "BOOTLOG no valid checkpoint prefix\n"));
++  }
++
++  SetMem ((VOID *)(UINTN)KEBAB_PROBE_BASE, KEBAB_PROBE_COUNT, 0);
++  WriteBackDataCacheRange ((VOID *)(UINTN)KEBAB_PROBE_BASE, KEBAB_PROBE_COUNT);
 +  gBS->Stall (5000000);
 +  return EFI_SUCCESS;
 +}
 diff --git a/Platforms/OnePlus/kebabPkg/Driver/KebabBootLog/KebabBootLog.inf b/Platforms/OnePlus/kebabPkg/Driver/KebabBootLog/KebabBootLog.inf
 new file mode 100644
-index 00000000..663677bd
+index 00000000..f3e911ec
 --- /dev/null
 +++ b/Platforms/OnePlus/kebabPkg/Driver/KebabBootLog/KebabBootLog.inf
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,28 @@
 +## @file
-+#  Reads the kernel checkpoint ring left in RAM by the probe stubs and prints it
-+#  to the firmware log, which Kebab renders on the panel.
++#  Reads the kernel checkpoint flags left in RAM by the probe stubs and prints
++#  them to the firmware log, which Kebab renders on the panel.
 +##
 +[Defines]
 +  INF_VERSION    = 0x00010005
@@ -128,6 +136,7 @@ index 00000000..663677bd
 +  UefiBootServicesTableLib
 +  BaseLib
 +  BaseMemoryLib
++  CacheMaintenanceLib
 +  DebugLib
 +
 +[Depex]
