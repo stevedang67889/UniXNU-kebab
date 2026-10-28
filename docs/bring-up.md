@@ -434,3 +434,41 @@ ring header at `0xB9000000` remains reserved; stage 2 can add records at
 The checkpoint table is in [`log-capture.md`](log-capture.md). The image built
 for the next run is `out/logprobe-boot.img`; the device result is the next
 measurement.
+
+## 2026-10-28 late: the DRAM flag page does not survive the reset
+
+The first logprobe image showed no flags, so the transport itself had to be
+isolated before the checkpoint table could answer anything:
+
+- `reset0`: `_PE_init_iokit` itself replaced by a PSCI reset -> the phone
+  reboots, so the kernel really reaches checkpoint 0.
+- `resetcave`: the checkpoint-0 call site branches to a cave that resets ->
+  reboots, so `bl cave` and the cave fetch work.
+- `helperreset` / `helperflush`: the helper and `Flush_Dcache` return, but the
+  ring still reads `ff`.
+- A temporary DarwinBoot colour band reports the actual `Address`: with the
+  4 GiB window the kernel physical base is **A = `0x20007C000`**, higher than
+  the 3 GiB build's `0xC007C000`.
+- A one-stub BSS probe at `0x7B281B0` (a real `__DATA` BSS buffer) does a direct
+  `strb 1`, `dc cvac`, `dsb`, then PSCI reset. It reboots, but the next reader
+  still sees no prefix.
+
+The store and reset execute (the reset follows them); the most consistent
+explanation is that the boot chain reinitialises normal DRAM, so the flag page
+does not carry across the reset. The `0xB9000010` ring, the `0xC0001000`/
+`0x200001000` DRAM probes and the BSS page all fail the same way.
+
+The **pram** page at `0x17F00FE0` is the panic-log page that is designed to
+survive the reset. UEFI leaves it unmapped; a reader that adds the page to the
+GCD and sets it uncached (`gDS->AddMemorySpace`,
+`gDS->SetMemorySpaceAttributes`) plus a one-stub
+`ml_phys_write_byte(0x17F00FE0, 1)` + reset image were built as
+`out/prammap-boot.img` (SHA-256
+`94bdad575f2beabee005027fc2ab54565ab379c0b58c51469b61e0efef6a95a6`). The device
+result is pending. If the pram one-stub reports `last=0`, move the 32 stubs from
+the ring to the pram bytes.
+
+Separately, the current firmware has **no UFS block device**: `UFSDxe` is
+disabled (vendor assert), `ScmDxeLA` is present, `TzDxeLA` is disabled and
+`SdccDxe` is present. SDCC does not replace UFS, so there is still no
+userdata/root volume.

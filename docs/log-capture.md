@@ -82,3 +82,36 @@ follow a set one. Random or stale ring bytes therefore print
 1. Boot the image under test; the kernel writes the flags as it passes the calls.
 2. Reboot into fastboot and boot the firmware again.
 3. Read the `BOOTLOG` lines on the panel. A warm reset keeps the page.
+
+## 2026-10-28: the ring write is not reset-persistent
+
+The first logprobe image still showed `ff`, so the transport was isolated before
+the checkpoint table could be trusted:
+
+- `_PE_init_iokit` replaced by a PSCI reset reboots, and a call site that
+  branches to a cave that resets also reboots: the kernel reaches checkpoint 0
+  and the cave executes.
+- The helper and `Flush_Dcache` return, but the ring stays `ff`.
+- A temporary DarwinBoot colour band measured the kernel physical base as
+  `0x20007C000` for the 4 GiB window (base A).
+- A one-stub direct `strb 1` + `dc cvac` + `dsb` + PSCI reset at a real
+  `__DATA` BSS buffer (`0x7B281B0`) reboots, but the next reader still sees no
+  valid prefix.
+
+Because the reset follows the store instruction, the store is not faulting; the
+flag is simply not there after the boot chain runs again. The working
+hypothesis is that normal DRAM is reinitialised and only the pram panic page
+survives. The `0xB9000010`, `0xC0001000` and `0x200001000` probes all failed the
+same way.
+
+pram (`0x17F00FE0`, the last 32 bytes of the 4 KiB panic page) is the persistent
+page. UEFI does not map it by default, so the next reader adds it with
+`gDS->AddMemorySpace` and `gDS->SetMemorySpaceAttributes` and reads it uncached.
+The one-stub event is `ml_phys_write_byte(0x17F00FE0, 1)` followed by a PSCI
+reset; the built image is `out/prammap-boot.img` (SHA-256
+`94bdad575f2beabee005027fc2ab54565ab379c0b58c51469b61e0efef6a95a6`). If it
+reports `last=0`, the 32 checkpoints move from the ring to `0x17F00FE0 + id`.
+
+The ring and BSS experiments also changed the reader rules: do not clear the
+flag page from the firmware (pram may be read-only to the firmware, and the
+kernel clears its own BSS), and accept only the value `1`, not any non-zero byte.
