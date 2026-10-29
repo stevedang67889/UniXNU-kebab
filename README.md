@@ -15,7 +15,7 @@ Tested on a KB2000 (12+256, ColorOS 14, unlocked).
 | `_machine_startup` → `_kernel_bootstrap` | working (a tail call, so nothing follows it) |
 | `kernel_bootstrap` up to `_bsd_init` | working once `PE_create_console` is replaced by a `ret` (`scripts/patch-func-ret.py`) |
 | Scheduler start, bootstrap thread, core services | working (the reset probe still fires after the first context switch) |
-| `PE_init_iokit` → `_bsd_init` | **current blocker** — with `PE_init_iokit`, `initialize_screen`, `kperf_init_early`, `ml_wait_max_cpus` and `platform_stall_panic_or_spin` skipped, the kernel stops in this gap; `scripts/patch-xnu-log-probe.py` puts 32 checkpoints in one boot; the DRAM flag page does not survive a reset, so the capture is moving to the pram page (see `docs/log-capture.md`) |
+| `PE_init_iokit` → `_bsd_init` | **current blocker** — inside `PE_init_iokit` the kernel stops in `IOPlatformExpertDevice` startup: the root nub is allocated, its constructor is a plain base-constructor chain, and the next measurement is the `IODeviceTreeAlloc` call in `IOPlatformExpertDevice::init`. With `PE_init_iokit`, `initialize_screen`, `kperf_init_early`, `ml_wait_max_cpus` and `platform_stall_panic_or_spin` skipped, the kernel runs on to just before `_bsd_init`; `scripts/patch-xnu-log-probe.py` puts 32 checkpoints in one boot, and the DRAM flag page does not survive a reset, so the capture is moving to the pram page (see `docs/log-capture.md`) |
 
 Two things were needed to get the kernel this far: a 3 GiB DRAM window that
 DarwinBoot loads the kernel into (`dram-base`, `dram-size` and

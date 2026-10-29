@@ -472,3 +472,161 @@ Separately, the current firmware has **no UFS block device**: `UFSDxe` is
 disabled (vendor assert), `ScmDxeLA` is present, `TzDxeLA` is disabled and
 `SdccDxe` is present. SDCC does not replace UFS, so there is still no
 userdata/root volume.
+
+## 2026-10-29: IOKit bring-up, the device tree read and the probe chain
+
+### Where the kernel stops
+
+The kernel runs `kernel_bootstrap`, the scheduler, the bootstrap thread and the
+core services, and enters `PE_init_iokit`. With `PE_create_console`, `vcattach`,
+`vc_progress_initialize` and `PE_get_default` replaced by a bare `ret` it reaches
+`_InitIOKit` and stops inside `IOPlatformExpertDevice` startup. The last proven
+checkpoint is the allocation of the root nub, the first unproven one is its
+constructor.
+
+### The bring-up kernel is reproducible
+
+The kernel used for every probe below is the CI Mach-O with exactly four
+functions replaced by a `ret`:
+
+| Function | Why it is skipped |
+| --- | --- |
+| `PE_create_console` | blocks in `ml_io_map_wcomb` while mapping the framebuffer at `0x9C000000` |
+| `vcattach` | the virtual console attaches to the same unmapped framebuffer |
+| `vc_progress_initialize` | the progress bar needs that mapping too |
+| `PE_get_default` | reads platform defaults from `/options` before the tree is usable |
+
+`tools/patch-func-ret.py` writes one `ret` per symbol. The clean CI kernel plus
+those four patches is
+`sha256 db666dcf2b930fac1ed5da95accf2a4ed5f9e6c780ab7445284bbcbeedcc7d96`,
+the `kernel-novc3.macho` this session builds from. The entry probe has to be
+applied to that un-probed kernel: `patch-xnu-entry-probe.py` refuses a kernel
+whose cave padding is not empty, so every experiment starts from the same four
+patches.
+
+### The constructor is not the stall
+
+`__ZN22IOPlatformExpertDeviceC1Ev` (`0xfffffff0078dcb2c`, `0x44` bytes) contains
+no loop, no indirect call and no lock. It chains the base constructors, stores
+the vtable and bumps the metaclass instance count:
+
+```
+mov  x19, x0
+adrp x20, 0xfffffff007af02d0          ; &gMetaClass
+bl   IOService::IOService(OSMetaClass const*)   ; -> IORegistryEntry -> OSObject
+add  x8, 0xfffffff0071bd408           ; __ZTV22IOPlatformExpertDevice + 0x10
+str  x8, [x0]                         ; vptr
+bl   OSMetaClass::instanceConstructed()         ; atomic increments, meta chain
+mov  x0, x19
+ret
+```
+
+The `IOService`, `IORegistryEntry` and `OSObject` constructors are the same shape
+(store a vtable, set the retain count to one), so a stall in the constructor
+would have to be a fault.
+
+`_InitIOKit` then stores the object in `gRootNub` and calls the virtual
+`IOPlatformExpertDevice::init(void *)` through vtable slot `+0x540`
+(`0xfffffff0071bd948` -> `0xfffffff0078dcbb8`). That function is the first code
+that reads the device tree:
+
+```
+IOPlatformExpertDevice::init(void *dtRoot)          ; 0xfffffff0078dcbb8
+  cbz  x1, super::init()                            ; no tree at all
+  bl   IODeviceTreeAlloc                            ; 0xfffffff00788b370
+  cbz  x0, super::init()                            ; tree could not be built
+  br   IOService::init(from, plane)                 ; 0xfffffff0078960b8, tail call
+```
+
+`IODeviceTreeAlloc` makes the device-tree plane, interns the property symbols,
+looks up `/chosen/memory-map`, builds an `IORegistryEntry` for every node,
+attaches them and then walks the new plane for interrupt sharing.
+
+### The ADT handed to the kernel
+
+The payload carries `kernel.macho.adt`, an Apple device tree built by
+`scripts/make-kebab-adt.py`. The one delivered for these runs is 13,980 bytes
+with 21 nodes, 122 properties and a maximum depth of two:
+
+```
+device-tree
+├ chosen (memory-map, manifest-properties)
+├ cpus (cpu0..cpu7)
+├ psci
+├ arm-io (gic, timer)
+├ defaults
+├ options
+├ product
+└ pram
+```
+
+A tree this small cannot make a walk loop, so a stall inside
+`IODeviceTreeAlloc` would be a lock or a fault rather than an endless loop.
+
+### Checkpoints proven on hardware
+
+Each run installs one checkpoint and reads the panel: after the entry bars a
+reboot at the configured delay means the call site was reached and the callee
+returned. Checkpoints that pass today:
+
+| Checkpoint | What it proves |
+| --- | --- |
+| `IOLibInit` | the IOKit pageable submap and lock group exist |
+| `OSlibkernInit` | the C++ constructors ran, including `iokit_post_constructor_init` |
+| `IOMachPortInitialize` | the mach port layer is up |
+| `OSSymbol::withCStringNoCopy` | symbol interning works |
+| `OSSet::withObjects` | container allocation works |
+| `interruptAccountingInit` | the interrupt accounting lock exists |
+| `IOPlatformExpertDevice::new` | the root nub allocation returned |
+
+### The probe recipe
+
+`board.toml [payload]` drives it:
+
+```toml
+entry_probe_reset_delay = 6
+entry_probe_reset_after = "__Z17IODeviceTreeAllocPv"       # symbol whose call is watched
+entry_probe_reset_in = "__ZN22IOPlatformExpertDevice4initEPv"  # function that makes the call
+```
+
+The patcher replaces the selected `bl` with a branch to a cave that performs the
+call, counts six seconds of the 19.2 MHz counter and issues PSCI
+`SYSTEM_RESET`. One flash therefore answers exactly one question, and the answer
+is the presence or absence of a reboot, not a colour.
+
+### Two traps found the hard way
+
+- `debug=0x144` enables a debug branch that calls `SecureDTLookupEntry` on
+  `/chosen/iBoot`; the phone stalls there before any IOKit code. `debug` must
+  stay out of `kernel_args`.
+- `cpus=1`, and `ret` patches on `ml_wait_max_cpus`, `kperf_init_early` and
+  `platform_stall_panic_or_spin`, do not change the current stall.
+
+### Build and flash chain
+
+```
+./unixnu build payload --uefi ~/Mu-Silicium --kernel kernel-novc3.macho \
+    --unique-chip-id 0123456789abcdef
+python3 scripts/pack-payload-mbr.py out/.../payload/payload.img <name>-payload-mbr.img
+# kebab.fdf: FILE = <name>-payload-mbr.img at 0x00300000
+./unixnu build firmware --uefi ~/Mu-Silicium
+./unixnu bootimg --uefi ~/Mu-Silicium --dtb desktop-kebab.dtb --ramdisk none -o <name>-boot.img
+fastboot flash boot_a <name>-boot.img
+```
+
+The payload is a 64 MiB FAT32 volume that must be wrapped in an MBR disk: the
+firmware publishes the raw region at `0x00300000` and `PartitionDxe` only
+creates a partition child when a partition table is present, so the FAT volume
+sits behind a type `0x0c` partition at LBA 2048
+(`scripts/pack-payload-mbr.py`). The boot image must carry the phone's live
+device tree; the images here use `desktop-kebab.dtb`
+(`sha256 8ba6ed34b8396102eac4d95769c56317aece50cf95b69cd3d98aa8353b27f293`),
+because the 11 MiB raw dump has trailing data and fails the totalsize check.
+
+### Where it stops now
+
+The next checkpoint is placed after the `IODeviceTreeAlloc` call inside
+`IOPlatformExpertDevice::init`. A reboot means the constructor returned and the
+device tree read completed, which moves the stall into `IOService::init`
+(`attachToParent` and the registry lock) or into `ConfigureIOKit` and
+`configureDefaults`. A stop means the stall is inside `IODeviceTreeAlloc`.
