@@ -130,11 +130,11 @@ loader = "firmware"
 title = "kebab first boot: source 4K XNU to console"
 dram_size = "0xC0000000"   # one 3 GiB DRAM window at 0xC0000000
 panic_screen = false
-# Entry probe (uncomment to bisect the kernel): a reboot N seconds after the
-# stage bars means the probe point was reached.
-# entry_probe_reset_delay = 6
-# entry_probe_reset_after = "_machine_conf"
-# entry_probe_reset_in = "_machine_startup"
+# Entry probe: a reboot six seconds after the stage bars means the call site in
+# entry_probe_reset_in was reached and the callee returned.
+entry_probe_reset_delay = 6
+entry_probe_reset_after = "__Z17IODeviceTreeAllocPv"
+entry_probe_reset_in = "__ZN22IOPlatformExpertDevice4initEPv"
 kernel_args = [
   "-v",
   "keepsyms=1",
