@@ -133,7 +133,7 @@ panic_screen = false
 # Entry probe: a reboot six seconds after the stage bars means the call site in
 # entry_probe_reset_in was reached and the callee returned.
 entry_probe_reset_delay = 6
-entry_probe_reset_after = "_vm_commpage_init"
+entry_probe_reset_after = "_OSKextRemoveKextBootstrap"
 entry_probe_reset_in = "_kernel_bootstrap_thread"
 entry_probe_reset_occurrence = 1
 kernel_args = [
