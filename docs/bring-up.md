@@ -630,3 +630,36 @@ The next checkpoint is placed after the `IODeviceTreeAlloc` call inside
 device tree read completed, which moves the stall into `IOService::init`
 (`attachToParent` and the registry lock) or into `ConfigureIOKit` and
 `configureDefaults`. A stop means the stall is inside `IODeviceTreeAlloc`.
+## 2026-10-30: IOKit initialisation passes, the stall moves to the commpage
+
+### The gic interrupts property was the IOKit blocker
+
+Bisecting `IODeviceTreeAlloc` with the entry probe narrowed it to the interrupt
+mapping loop: the checkpoint after the tree walk (`getRegistryRoot`) and after
+`IORegistryIterator::iterateOver` both fired, the one after `IODeviceTreeAlloc`
+did not. The only node with an `interrupts` property was the GIC, and the ADT
+carries a plain `phandle` while IOKit registers and resolves `AAPL,phandle`.
+`IODTFindInterruptParent` therefore returned NULL and
+`IODTGetICellCounts(NULL)` dereferenced it - the bootloader shows a CPU
+exception screen after enough of those resets.
+
+Leaving `interrupts` off the gic node in `dts/kebab.dts` clears the whole IOKit
+stage: `IODeviceTreeAlloc`, `IOPlatformExpertDevice::init`, `IOService::init`,
+`attach`, `InitIOKit` and `ConfigureIOKit` all return. The proper fix is for the
+ADT generator to emit `AAPL,phandle`.
+
+### The bring-up kernel is now six patches
+
+`PE_create_console`, `vcattach`, `vc_progress_initialize`, `PE_get_default`,
+`initialize_screen` and `kperf_init_early` are replaced by a `ret`
+(`sha256 9531eef048f30eba31d159194260e19044fec25b9cd605cbbb2c82ca997d1461`).
+
+### Where it stops now
+
+`kernel_bootstrap_thread` runs `PE_init_iokit`, `kernel_startup_initialize_upto(16)`,
+`initialize_screen`, `vm_commpage_init`, `vm_commpage_text_init`,
+`mac_policy_initmach`, `dtrace_early_init`, `sdt_early_init`,
+`OSKextRemoveKextBootstrap`, `machine_lockdown`, `kernel_do_post`,
+`PE_lockdown_iokit`, `vm_set_restrictions` and `kperf_init_early` before
+`bsd_init`. Checkpoints show startup step 16 returning and the stall in
+`vm_commpage_init`, inside `commpage_populate`.
