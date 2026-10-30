@@ -3043,7 +3043,9 @@
 			#redistributor-regions = <0x01>;
 			redistributor-stride = <0x00 0x20000>;
 			reg = <0x17a00000 0x10000 0x17a60000 0x100000>;
-			interrupts = <0x01 0x09 0x04>;
+			// XNU maps this by interrupt-parent; without AAPL,phandle the parent lookup
+			// returns NULL and IODTMapOneInterrupt dereferences it, so leave it out
+			// until the ADT carries AAPL,phandle.
 			phandle = <0x01>;
 		};
 
