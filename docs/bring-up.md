@@ -663,3 +663,76 @@ ADT generator to emit `AAPL,phandle`.
 `PE_lockdown_iokit`, `vm_set_restrictions` and `kperf_init_early` before
 `bsd_init`. Checkpoints show startup step 16 returning and the stall in
 `vm_commpage_init`, inside `commpage_populate`.
+
+## 2026-10-31: from IOKit to bsd_init, and the interrupt-controller circle
+
+### The checkpoint chain that works
+
+With IRQs kept masked and a handful of bring-up patches the whole
+`kernel_bootstrap_thread` runs and `bsd_init` is entered:
+
+```
+PE_init_iokit            ✓
+kernel_startup_initialize_upto(16)  ✓
+initialize_screen        ✓ (ret)
+vm_commpage_init/text    ✓ (ret)
+mac_policy_initmach      ✓ (needs OSKextLog out of the way)
+vnguard_policy_init      ✓
+dtrace_early_init        ✓
+sdt_early_init           ✓
+OSKextRemoveKextBootstrap ✓ (ret)
+mbuf_tag_init            ✓
+machine_lockdown         ✓ (ret)
+kernel_list_tests/do_post ✓ (do_post must return 0)
+PE_lockdown_iokit        ✓ (ret)
+vm_set_restrictions      ✓ (ret)
+kperf_init_early         ✓ (ret)
+bsd_init                 entered, does not return
+```
+
+Two things were learned the hard way:
+
+- Checkpoints at or after `ml_set_interrupts_enabled(1)` never fire unless
+  that call is replaced by a `nop`, so the bisection looked contradictory
+  for a day.
+- `kernel_do_post`'s return value is checked with `cbnz` before the `Assert`
+  path at `0xfffffff007984414`; a plain `ret` leaves garbage in `x0` and the
+  boot jumps straight to the panic.
+
+### The devicetree GIC bug (fixed)
+
+`pe_arm_map_interrupt_controller()` maps the controller as
+`ml_io_map(soc_phys + *reg_prop, ...)`, where `soc_phys` is the arm-io window
+base (`0x17000000`). The generator had added that base to the GIC and timer
+`reg` values "because XNU does not add it back", which double-mapped both to
+`0x2EA00000`. `_inject_xnu_nodes` now keeps the window offsets, so the ADT
+says `reg = <0xa00000 0x10000 0xa60000 0x100000>` and the addresses resolve
+to `0x17a00000` and `0x17a60000`.
+
+### The circle that holds the boot
+
+```
+StartIOKitMatching
+  -> IOPlatformExpertDevice::startIOServiceMatching
+    -> IOWorkLoop::workLoop
+      -> OSObject_typed_operator_new
+        -> kalloc_type_impl_internal
+          -> zalloc_ext(..., Z_NOFAIL)      retries forever
+```
+
+`Z_NOFAIL` cannot finish because the machine has one CPU, no interrupt
+controller and IRQs masked, so a zone that needs to grow never does. And the
+interrupt controller is what would break the circle: `ArmCpu::start()` (in
+`drivers/ArmCpu/ArmCpu.cpp`) is where `prepareGic`/`mapGic`/`enableGic` run,
+and `ArmCpu` is only started by IOKit matching.
+
+So the GIC, the kext matching and the allocator are one dependency cycle. It
+has to be broken at the GIC:
+
+- Build the kernel with a GIC path that does not need matching (the generic
+  `osfmk/arm64/gic_v3_irq.c` driver, which reads `/arm-io/gic` - the ADT now
+  encodes exactly what it wants), or
+- make `ArmCpu::prepareGic()` run before matching.
+
+Either way the kernel has to be rebuilt, and the kernel comes from the macOS
+CI build (`workflow_dispatch`, `kebab_defconfig`).
