@@ -3,11 +3,11 @@
 #
 #   bash device/scripts/ufs-ci-pre-build.sh
 #
-# ShengUfs is selected as the component the framework already pins.  Its block
-# class needs the sheng verified-root bundle, which kebab does not have yet, so
-# build-arm-driver.py is patched in the framework checkout to drop
-# -DNATIVE_VERIFIED_BLOCK.  On a compile failure the full compiler output is
-# copied into the work logs directory, which the workflow uploads.
+# 1. Select the pinned ShengUfs component in the device board.
+# 2. Materialize its submodule and move timerTicks()/native_ufs_read_ticks out
+#    of the NATIVE_VERIFIED_BLOCK guard: the transport's read path uses them
+#    and the probe-only build has no verified-root bundle yet.
+# 3. Patch build-arm-driver.py to build NativeUfs without the verified block.
 set -euo pipefail
 DEVICE=${UNIXNU_DEVICE:-$PWD/device}
 
@@ -40,6 +40,41 @@ print('defconfig: CONFIG_XNU_NATIVE_UFS=y')
 PY
 
 python3 - <<'PY'
+import subprocess
+from pathlib import Path
+
+try:
+    subprocess.run(['git', 'submodule', 'update', '--init', '--depth', '1', 'drivers/ShengUfs'],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+except FileNotFoundError:
+    pass
+
+path = Path('drivers/ShengUfs/NativeUfs.cpp')
+if not path.is_file():
+    print('ShengUfs: submodule source missing; left unchanged')
+    raise SystemExit(0)
+
+text = path.read_text()
+old = ('#if defined(NATIVE_VERIFIED_BLOCK) && NATIVE_VERIFIED_BLOCK\n'
+       'volatile uint64_t native_ufs_verified_blocks = 0;\n'
+       '// Time spent hashing/verifying and reading from the UFS transport, in generic-timer ticks (diagnostic only).\n'
+       'volatile uint64_t native_ufs_verify_ticks = 0, native_ufs_read_ticks = 0;\n'
+       'static inline uint64_t timerTicks (void) {uint64_t v; __asm__ volatile ("isb\\n\\tmrs %0, cntpct_el0" : "=r" (v)); return v;}\n'
+       'volatile uint32_t native_ufs_integrity_failures = 0;\n')
+new = ('// Time spent hashing/verifying and reading from the UFS transport, in generic-timer ticks (diagnostic only).\n'
+       'volatile uint64_t native_ufs_verify_ticks = 0, native_ufs_read_ticks = 0;\n'
+       'static inline uint64_t timerTicks (void) {uint64_t v; __asm__ volatile ("isb\\n\\tmrs %0, cntpct_el0" : "=r" (v)); return v;}\n'
+       '#if defined(NATIVE_VERIFIED_BLOCK) && NATIVE_VERIFIED_BLOCK\n'
+       'volatile uint64_t native_ufs_verified_blocks = 0;\n'
+       'volatile uint32_t native_ufs_integrity_failures = 0;\n')
+if old in text:
+    path.write_text(text.replace(old, new))
+    print('ShengUfs: timerTicks/native_ufs_read_ticks moved out of the guard')
+else:
+    print('ShengUfs: guard block not found; source left unchanged')
+PY
+
+python3 - <<'PY'
 from pathlib import Path
 
 path = Path('scripts/build-arm-driver.py')
@@ -53,16 +88,6 @@ new = ("if component == 'NativeUfs':\n"
        "                '-mgeneral-regs-only']\n")
 if old not in text:
     raise SystemExit('build-arm-driver.py NativeUfs branch changed; update the pre-build')
-text = text.replace(old, new)
-
-old_fail = "if result.returncode:\n    raise SystemExit(result.stdout[-3500:])\n"
-new_fail = ("if result.returncode:\n"
-            "    logdir = ROOT.parent / 'logs'\n"
-            "    logdir.mkdir(parents=True, exist_ok=True)\n"
-            "    (logdir / ('component-' + identifier + '-compile.log')).write_bytes((out / 'compile.log').read_bytes())\n"
-            "    raise SystemExit(result.stdout[-3500:])\n")
-if old_fail not in text:
-    raise SystemExit('build-arm-driver.py failure path changed; update the pre-build')
-path.write_text(text.replace(old_fail, new_fail))
-print('build-arm-driver.py: probe-only and full compile log on failure')
+path.write_text(text.replace(old, new))
+print('build-arm-driver.py: NativeUfs builds without NATIVE_VERIFIED_BLOCK')
 PY
