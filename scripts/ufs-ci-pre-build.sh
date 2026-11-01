@@ -2,8 +2,9 @@
 # UFS pre-build for the 407db1a framework (branch old-fw).
 #
 # The working base kernel was built by this framework with only the (empty)
-# soc patch series, so this reproduces that configuration and adds the UFS
-# driver as a component whose build recipe compiles it probe-only.
+# soc patch series. The one patch the build does need on the current runner is
+# local-availability.patch (the availability.pl lookup), so the board applies a
+# device series with just that entry.
 set -euo pipefail
 DEVICE=${UNIXNU_DEVICE:-$PWD/device}
 
@@ -26,11 +27,15 @@ if '"NativeUfs"' not in text:
     text = text[:match.start()] + 'include = [' + ', '.join(items) + ']' + text[match.end():]
 
 text = re.sub(r'^patch_series\s*=\s*\[.*?\]\s*$',
-              'patch_series = ["soc:patches/xnu/series"]', text, count=1, flags=re.M)
+              'patch_series = ["device:patches/xnu/series"]', text, count=1, flags=re.M)
 text = re.sub(r'^config_fragments\s*=\s*\[.*?\]\s*$',
               'config_fragments = ["soc:configs/sm8250.config"]', text, count=1, flags=re.M)
 board.write_text(text)
-print('board.toml: NativeUfs selected; soc-only fragments and patch series')
+
+series = device / 'patches/xnu/series'
+series.parent.mkdir(parents=True, exist_ok=True)
+series.write_text('arch:../../../patches/xnu/local-availability.patch\n')
+print('board.toml: NativeUfs selected, device series with local-availability')
 
 revision = subprocess.check_output(['git', '-C', str(device), 'rev-parse', 'HEAD'], text=True).strip()
 catalog = Path('components.toml')
