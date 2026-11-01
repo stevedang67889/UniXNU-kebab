@@ -34,7 +34,9 @@ board.write_text(text)
 
 series = device / 'patches/xnu/series'
 series.parent.mkdir(parents=True, exist_ok=True)
-series.write_text('arch:../../../patches/xnu/local-availability.patch\n')
+series.write_text('arch:../../../patches/xnu/local-availability.patch\n'
+                   'arch:../../../patches/xnu/non-apple-pmap-field.patch\n'
+                   'arch:../../../patches/xnu/public-entitlements-header.patch\n')
 print('board.toml: NativeUfs selected, device series with local-availability')
 
 revision = subprocess.check_output(['git', '-C', str(device), 'rev-parse', 'HEAD'], text=True).strip()
