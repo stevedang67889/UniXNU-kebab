@@ -6,8 +6,8 @@
 # ShengUfs is selected as the component the framework already pins.  Its block
 # class needs the sheng verified-root bundle, which kebab does not have yet, so
 # build-arm-driver.py is patched in the framework checkout to drop
-# -DNATIVE_VERIFIED_BLOCK: the transport and its diagnostics stay, the block
-# class and the VerifiedRoot/IOBlockStorageDevice references go.
+# -DNATIVE_VERIFIED_BLOCK.  On a compile failure the full compiler output is
+# copied into the work logs directory, which the workflow uploads.
 set -euo pipefail
 DEVICE=${UNIXNU_DEVICE:-$PWD/device}
 
@@ -53,6 +53,16 @@ new = ("if component == 'NativeUfs':\n"
        "                '-mgeneral-regs-only']\n")
 if old not in text:
     raise SystemExit('build-arm-driver.py NativeUfs branch changed; update the pre-build')
-path.write_text(text.replace(old, new))
-print('build-arm-driver.py: NativeUfs builds without NATIVE_VERIFIED_BLOCK')
+text = text.replace(old, new)
+
+old_fail = "if result.returncode:\n    raise SystemExit(result.stdout[-3500:])\n"
+new_fail = ("if result.returncode:\n"
+            "    logdir = ROOT.parent / 'logs'\n"
+            "    logdir.mkdir(parents=True, exist_ok=True)\n"
+            "    (logdir / ('component-' + identifier + '-compile.log')).write_bytes((out / 'compile.log').read_bytes())\n"
+            "    raise SystemExit(result.stdout[-3500:])\n")
+if old_fail not in text:
+    raise SystemExit('build-arm-driver.py failure path changed; update the pre-build')
+path.write_text(text.replace(old_fail, new_fail))
+print('build-arm-driver.py: probe-only and full compile log on failure')
 PY
