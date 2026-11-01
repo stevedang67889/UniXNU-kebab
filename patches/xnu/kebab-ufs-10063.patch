@@ -12,7 +12,7 @@ index 19b4065..4f8203d 100644
  bsd/dev/unix_startup.c			standard
 diff --git a/bsd/dev/kebab_ufs.c b/bsd/dev/kebab_ufs.c
 new file mode 100644
-index 0000000..a90270f
+index 0000000..1d66736
 --- /dev/null
 +++ b/bsd/dev/kebab_ufs.c
 @@ -0,0 +1,852 @@
@@ -300,7 +300,7 @@ index 0000000..a90270f
 +	if (len) {
 +		dma_sync(DMA_BOUNCE, len, true);
 +	}
-+	__builtin_arm_dsb(0xf);
++	__asm__ volatile("dsb sy" ::: "memory");
 +
 +	ufs_wr(REG_UTRLDBR, 1);
 +	uint64_t deadline;
@@ -319,7 +319,7 @@ index 0000000..a90270f
 +		}
 +		delay(1);
 +	}
-+	__builtin_arm_dsb(0xf);
++	__asm__ volatile("dsb sy" ::: "memory");
 +	uint32_t status = ufs_rd(REG_IS);
 +	ufs_wr(REG_IS, status);                 /* W1C, after saving error status */
 +	if (status & IS_FATAL) {
