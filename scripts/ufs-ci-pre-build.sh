@@ -32,9 +32,19 @@ text = re.sub(r'^config_fragments\s*=\s*\[.*?\]\s*$',
               'config_fragments = ["soc:configs/sm8250.config"]', text, count=1, flags=re.M)
 board.write_text(text)
 
+# The archive pass runs before the kernel pass, so the corecrypto archive
+# builder has no link.filelist yet. The defconfig's source corecrypto path
+# builds it in-tree; drop the archive entries.
+text = board.read_text()
+text = re.sub(r'^\s*"build-corecrypto-14\.py[^"]*",\n', '', text, flags=re.M)
+board.write_text(text)
+print('board.toml: corecrypto archive entries dropped')
+
 series = device / 'patches/xnu/series'
 series.parent.mkdir(parents=True, exist_ok=True)
 series.write_text('arch:../../../patches/xnu/local-availability.patch\n'
+                   'arch:../../../patches/xnu/kernel-sdk-root.patch\n'
+                   'arch:../../../patches/xnu/disabled-deferred-reclaim.patch\n'
                    'arch:../../../patches/xnu/non-apple-pmap-field.patch\n'
                    'arch:../../../patches/xnu/public-entitlements-header.patch\n')
 print('board.toml: NativeUfs selected, device series with local-availability')
