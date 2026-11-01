@@ -67,3 +67,17 @@ if old not in text:
 path.write_text(text.replace(old, new))
 print('build-arm-driver.py: NativeUfs builds without NATIVE_VERIFIED_BLOCK')
 PY
+
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path('patches/xnu/architectural-timer-entry.patch')
+text = path.read_text()
+old = '+#if defined(BCM2837) && (!defined(XNU_NATIVE_ARCH_TIMER) || !XNU_NATIVE_ARCH_TIMER)\n'
+new = '+#if defined(BCM2837)\n'
+if old in text:
+    path.write_text(text.replace(old, new))
+    print('architectural-timer-entry.patch: BCM2837 timer routing kept unconditionally')
+else:
+    print('architectural-timer-entry.patch: condition line not found (already patched?)')
+PY
