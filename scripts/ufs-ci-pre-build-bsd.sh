@@ -36,6 +36,7 @@ series.parent.mkdir(parents=True, exist_ok=True)
 series.write_text('arch:../../../patches/xnu/local-availability.patch\n'
                   'arch:../../../patches/xnu/disabled-deferred-reclaim.patch\n'
                   'arch:../../../patches/xnu/non-apple-pmap-field.patch\n'
+                  'arch:../../../patches/xnu/source-machine-layer.patch\n'
                   'arch:../../../patches/xnu/public-entitlements-header.patch\n'
                   'arch:../../../patches/xnu/published-freezer-condition.patch\n'
                   '10063-kern-exec-entitlements.patch\n'
