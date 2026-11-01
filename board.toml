@@ -130,14 +130,11 @@ loader = "firmware"
 title = "kebab first boot: source 4K XNU to console"
 dram_size = "0xC0000000"   # one 3 GiB DRAM window at 0xC0000000
 panic_screen = false
-# Entry probe: a reboot six seconds after the stage bars means the call site in
-# entry_probe_reset_in was reached and the callee returned.
-entry_probe_reset_delay = 6
-entry_probe_reset_after = "_kperf_init_early"
-entry_probe_reset_in = "_kernel_bootstrap_thread"
-entry_probe_reset_occurrence = 1
+# No entry probe: this is the baseline boot image.
 kernel_args = [
   "-v",
+  # For the UFS-root experiment add:
+  #   "rd=ufsroot0", "ufsroot=userdata", "rootrw=0",
   "keepsyms=1",
   "kt_fixed_zones=120",
 ]

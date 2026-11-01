@@ -40,8 +40,15 @@ as a black panel.
 
 ## Current stage
 
-Firmware, menu, payload volume and DarwinBoot work. The kernel is entered,
-enables the MMU and reaches `_machine_startup`. It stops inside `_machine_conf`.
+Firmware, menu, payload volume and DarwinBoot work. The old-fw CI kernel builds
+and reaches the early kernel log. The current stop is before `bsd_init`: the last
+line is `Unable to find vm tag ?+z for btlog`. The GIC handler is installed and
+the first PPI-27 IRQ fires, but no periodic timer tick follows; the old
+`kernel-novc3` with the same GIC/FB/bring-up patch stops at the same point.
+
+The BSD `kebab_ufs` driver is linked (`kebab_ufs_rootdev`), the ADT contains the
+root `/kebab-ufs` node, and `board.toml` documents the `rd=ufsroot0
+ufsroot=userdata rootrw=0` arguments. It has not been reached on hardware yet.
 
 Two firmware facts are easy to lose and expensive to rediscover:
 
@@ -52,7 +59,9 @@ Two firmware facts are easy to lose and expensive to rediscover:
 
 ## Probes
 
-`board.toml` installs a reset probe instead of a screen bar:
+`board.toml` currently has **no entry probe**; normal boots use the baseline
+kernel. For a bisect, add `entry_probe_reset_delay`, `entry_probe_reset_after`
+and `entry_probe_reset_in` and remove them afterwards:
 
 ```toml
 entry_probe_reset_delay = 6

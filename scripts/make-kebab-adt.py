@@ -240,9 +240,14 @@ def main():
                                                 GIC_REDIST - ARMIO_BASE, GIC_REDIST_SIZE)),
                             ('redistributor-stride', struct.pack('<Q', GIC_REDIST_STRIDE))]),
               # UFS (0x01D84000) lies far below the arm-io window, so a child reg
-              # offset would be negative. The node exists only for class matching;
-              # the driver takes its physical windows from board constants.
+              # offset would be negative.  Keep this class-matching node and put
+              # the absolute register window on the root /kebab-ufs node below.
               node('ufshc', [('compatible', b'qcom,sm8250-ufshc\0qcom,kona-ufshc\0')])]),
+        # The BSD UFS driver reads an absolute 16-byte reg property here.  The
+        # controller sits below arm-io, so this node is deliberately a root
+        # child rather than an offset under the arm-io ranges window.
+        node('kebab-ufs', [('compatible', b'qcom,sm8250-ufshc\0qcom,kona-ufshc\0'),
+                           ('reg', struct.pack('<QQ', UFS_HC, 0x30000))]),
     ])
 
     args.output.parent.mkdir(parents=True, exist_ok=True)

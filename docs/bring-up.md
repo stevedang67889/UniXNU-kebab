@@ -736,3 +736,68 @@ has to be broken at the GIC:
 
 Either way the kernel has to be rebuilt, and the kernel comes from the macOS
 CI build (`workflow_dispatch`, `kebab_defconfig`).
+
+
+## 2026-11-01: old-fw CI, BSD UFS driver, and the timer stop
+
+### Reproducible old-fw kernel
+
+The `old-fw` branch now builds a kernel on the macOS runner with the build fixes
+that the 407db1a source needs: corecrypto archive, `kern_exec` entitlement,
+freezer condition, source pmap, non-Apple IOMMU/cache monitor, 4K bootstrap
+capacity, pmap PA sync, pthread bootstrap, XnuPrelink sparse-index and the SDK
+include/link paths. The workflow uploads `kernel-kebab-1`; the build artifact
+used for the last tests is
+`23c90f36f09ac622d62fdccbb4e5c99357d1720a63fe2c9bbacaa7e0079f5818`.
+
+### BSD UFS driver
+
+GFander's `bsd/dev/kebab_ufs.c` is now a normal `bsd/conf/files` entry with a
+small `IOFindBSDRoot` hook. It uses the BSD `bdevsw` interface and does not use
+the IOKit `IOBlockStorageDevice`/VerifiedRoot ABI. The root ADT node is:
+
+```
+/kebab-ufs  reg = <0x01d84000 0x30000>
+```
+
+The matching boot arguments are `rd=ufsroot0 ufsroot=userdata rootrw=0`
+(`ufsrw=1` would allow writes). `kebab_ufs_rootdev` is linked in the kernel and
+the driver source compiled cleanly; the remaining question is whether the kernel
+reaches `IOFindBSDRoot` at all.
+
+### What the panel measured
+
+The framebuffer logger was extended with persistent colour markers:
+
+| Colour | Meaning |
+| --- | --- |
+| cyan (top strip) | FB logger is alive |
+| green | a `KEBAB UFS` line was printed |
+| blue | `BSD root: ufsroot0` |
+| red | `panic` / `Still waiting for root device` |
+| yellow | `bsd_init` |
+| magenta | `IOFindBSDRoot` / `Waiting on` |
+
+On the tested images the top cyan strip appeared, so the logger worked. None of
+the stage colours appeared: `bsd_init`, `IOFindBSDRoot` and `KEBAB UFS` were
+never reached. The last kernel line was:
+
+```
+Unable to find vm tag ?+z for btlog
+```
+
+A GIC-only image (no framebuffer logger) showed the GIC progress bands: the
+handler was installed and the first PPI-27 IRQ ran (magenta/cyan). The
+heartbeat band then stayed static. Re-arming `CNTV_TVAL_EL0` and
+`CNTV_CTL_EL0` after `rtclock_intr`, and a diagnostic run that skipped
+`rtclock_intr`, both produced the same static result. The old
+`kernel-novc3` with the same GIC/FB/bring-up patch also stopped at the same
+point. The blocker is therefore the periodic timer tick/early allocator path,
+not the UFS driver.
+
+### Next
+
+1. Fix the PPI-27 periodic timer (or route another timer source) so the early
+   allocator can make progress; a UART on `0xA90000` would make this much faster.
+2. Re-test `rd=ufsroot0` and read the green/blue markers; the UFS driver and ADT
+   node are already in place.

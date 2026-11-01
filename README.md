@@ -2,27 +2,29 @@
 
 UniXNU device repository for the **OnePlus 8T (kebab, Qualcomm SM8250)**.
 
-## Status (2026-10-28)
+## Status (2026-11-01)
 
 Tested on a KB2000 (12+256, ColorOS 14, unlocked).
 
 | Stage | State |
 | --- | --- |
-| Mu-Silicium UEFI from `boot_a` | working, panel log readable, keys work |
-| UniXNU menu from the payload volume | working (`KebabRamDisk` publishes the FDF region as BlockIo) |
-| DarwinBoot: validate, load, exit boot services | working once the exit-boot-services notifications are skipped (see `docs/patches/mu-basecore-kebab.patch`) |
-| XNU entry and MMU enable | working (entry bar, then the six-second reset probe fires) |
-| `_machine_startup` → `_kernel_bootstrap` | working (a tail call, so nothing follows it) |
-| `kernel_bootstrap` up to `_bsd_init` | working once `PE_create_console` is replaced by a `ret` (`scripts/patch-func-ret.py`) |
-| Scheduler start, bootstrap thread, core services | working (the reset probe still fires after the first context switch) |
-| `PE_init_iokit` → `_bsd_init` | **current blocker** — inside `PE_init_iokit` the kernel stops in `IOPlatformExpertDevice` startup: the root nub is allocated, its constructor is a plain base-constructor chain, and the next measurement is the `IODeviceTreeAlloc` call in `IOPlatformExpertDevice::init`. With `PE_init_iokit`, `initialize_screen`, `kperf_init_early`, `ml_wait_max_cpus` and `platform_stall_panic_or_spin` skipped, the kernel runs on to just before `_bsd_init`; `scripts/patch-xnu-log-probe.py` puts 32 checkpoints in one boot, and the DRAM flag page does not survive a reset, so the capture is moving to the pram page (see `docs/log-capture.md`) |
+| Mu-Silicium UEFI, menu, payload volume, DarwinBoot | working |
+| old-fw CI kernel build (`407db1a` + build fixes) | working; the uploaded artifact is `kernel-kebab-1` |
+| XNU entry, `kernel_bootstrap`, GIC stub | working; the GIC handler is installed and the first timer IRQ fires |
+| periodic timer IRQ | **not working**; the heartbeat band never advances, so an early allocator wait can still stop the boot |
+| `bsd_init` / `IOFindBSDRoot` | **not reached** on the tested images; the last kernel line is `Unable to find vm tag ?+z for btlog` |
+| BSD `kebab_ufs` driver | linked (`kebab_ufs_rootdev`); it will publish `ufsroot0` once root discovery runs |
+| UFS root (`rd=ufsroot0`) | blocked by the early kernel stop above, not by the UFS driver source |
 
-Two things were needed to get the kernel this far: a 3 GiB DRAM window that
-DarwinBoot loads the kernel into (`dram-base`, `dram-size` and
-`darwinboot-memory-size` all `0xC0000000`), and the device tree nodes XNU looks
-up by property (`arm-io/gic` with `interrupt-controller = "master"`, a timer
-node, `virtual-timer-intid`, `/pram`). See `docs/bring-up.md` for the measured
-chain and `docs/log-capture.md` for the 32-checkpoint flag capture.
+The old 2026-10-28 table described the `PE_init_iokit` bisection; that history is
+in `docs/bring-up.md`. The measured 2026-11-01 stop is earlier: the kernel
+prints the btlog tag warning and never reaches `bsd_init`.
+
+The GIC stub reports handler-installed (magenta) and first-IRQ (cyan) bands, but
+no repeated timer tick. Re-arming `CNTV_TVAL_EL0`/`CNTV_CTL_EL0` after
+`rtclock_intr`, and even skipping `rtclock_intr`, both leave the screen static.
+The old `kernel-novc3` with the same GIC/FB/bring-up patch stops at the same
+point, so the next work is the timer/PPI-27 path, not the UFS driver.
 
 ## Layout
 
@@ -91,14 +93,14 @@ flash to `boot_a` instead and reboot.
 
 ## Remaining work
 
-* **UFS**: the vendor `UFSDxe` asserts with `Device Error` at `UFS.c:1004`.
-  Setting `EnableUfsIOC = 1` (as `alioth` does) removes the assert, but no block
-  device is produced yet, so UniXNU still falls back to its built-in menu.
-  The diagnostic driver `FsProbe` (see `docs/bring-up.md`) reports
-  *0 block devices, 0 file systems*.
-* **Payload volume**: UniXNU scans every `SimpleFileSystem` handle for
-  `\EFI\UniXNU\unixnu.toml`. Until UFS exposes a volume, the config embedded in
-  the firmware (`Config.c` fallback) is what the menu shows.
+* **Timer / GIC**: the GIC handler and the first PPI-27 IRQ work, but the
+  virtual timer does not repeat. `CNTV_TVAL_EL0`/`CNTV_CTL_EL0` re-arms after
+  `rtclock_intr`, and a run that skips `rtclock_intr`, both remain static. Fix
+  the periodic tick (or route a different timer source) before chasing UFS.
+* **UFS**: `bsd/dev/kebab_ufs.c` is linked and exposes the BSD `ufsroot0` hook;
+  the ADT has the root `/kebab-ufs` node and the boot args are documented in
+  `board.toml`. Root discovery is not reached yet, so the driver has no hardware
+  result.
 * **Display / touch drivers** for the kernel, and the `userdata` image flash.
 
 ## License

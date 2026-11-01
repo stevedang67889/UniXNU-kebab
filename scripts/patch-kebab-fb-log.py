@@ -194,6 +194,8 @@ def main():
     parser.add_argument('kernel', type=Path, help='the COPY of the kernel to patch in place')
     parser.add_argument('--font-dir', type=Path,
                         help='directory holding Font.h (default: $UNIXNU_UEFI/.../FrameBufferSerialPortLib)')
+    parser.add_argument('--cave', metavar='ADDRESS', type=lambda text: int(text, 0),
+                        help='place the stub at this virtual address instead of the trailing padding')
     parser.add_argument('--dry-run', action='store_true')
     args = parser.parse_args()
 
@@ -219,7 +221,15 @@ def main():
 
     hooks = {'_printf': 'kebab_fb_log', '_vprintf': 'kebab_fb_log_vprintf'}
     site = by_name['_printf']
-    cave_start, cave_end = trailing_cave(data, site)
+    if args.cave is not None:
+        vmaddr, vmsize, _, filesize, initprot = segment_containing(args.cave)
+        if not initprot & EXECUTE:
+            raise SystemExit(f'{args.cave:#x} is not in an executable segment')
+        if args.cave % 4:
+            raise SystemExit(f'{args.cave:#x} is not 4-byte aligned')
+        cave_start, cave_end = args.cave, vmaddr + min(vmsize, filesize)
+    else:
+        cave_start, cave_end = trailing_cave(data, site)
     defines = {'PE_STATE': by_name['_PE_state'], 'SCRATCH': scratch_address()}
     with tempfile.TemporaryDirectory() as tmp:
         code, load, symbols = assemble_c(STUB, cave_start, Path(tmp), defines,

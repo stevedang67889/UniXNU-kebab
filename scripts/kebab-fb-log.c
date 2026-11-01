@@ -201,6 +201,51 @@ static u32 format(struct ctx *g, const char *fmt, const u64 *args)
   return used;
 }
 
+
+/* A solid marker at the bottom of the panel.  The colour is the result:
+ * green = the UFS driver printed a KEBAB UFS line, blue = BSD root selected,
+ * red = a panic or the root wait.  It survives log scrolling. */
+static int
+text_prefix(const char *s, const char *prefix)
+{
+  while (*prefix) {
+    if (*s++ != *prefix++) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+
+static void
+paint_top(struct ctx *g, u32 colour)
+{
+  u32 y, x;
+  u32 bottom = g->h > 24 ? 24 : g->h;
+  for (y = 0; y < bottom; y++) {
+    for (x = 0; x < g->w; x++) {
+      *(volatile u32 *)(g->base + (u64)y * g->rb + (u64)x * 4) = colour;
+    }
+  }
+}
+
+static void
+paint_bar(struct ctx *g, u32 colour)
+{
+  u32 y, x;
+  u32 top = g->h / 3;
+  u32 bottom = (g->h * 2) / 3;
+  if (bottom <= top) {
+    top = 0;
+    bottom = g->h;
+  }
+  for (y = top; y < bottom; y++) {
+    for (x = 0; x < g->w; x++) {
+      *(volatile u32 *)(g->base + (u64)y * g->rb + (u64)x * 4) = colour;
+    }
+  }
+}
+
 /* x0 = fmt as for printf(); x1 is the anonymous-argument pointer. */
 __attribute__((used)) int kebab_fb_log_main(const char *fmt, const u64 *args)
 {
@@ -236,6 +281,22 @@ __attribute__((used)) int kebab_fb_log_main(const char *fmt, const u64 *args)
     state[0] = 0;
     state[1] = 0;
     state[2] = 1;
+  }
+  paint_top(&g, 0xFF00FFFFu);
+  if (readable(fmt)) {
+    if (text_prefix(fmt, "KEBAB UFS")) {
+      paint_bar(&g, 0xFF00FF00u);
+    } else if (text_prefix(fmt, "BSD root")) {
+      paint_bar(&g, 0xFF0000FFu);
+    } else if (text_prefix(fmt, "panic") ||
+               text_prefix(fmt, "Still waiting")) {
+      paint_bar(&g, 0xFFFF0000u);
+    } else if (text_prefix(fmt, "bsd_init")) {
+      paint_bar(&g, 0xFFFFFF00u);
+    } else if (text_prefix(fmt, "IOFindBSDRoot") ||
+               text_prefix(fmt, "Waiting on")) {
+      paint_bar(&g, 0xFFFF00FFu);
+    }
   }
   g.x = (u32)state[0];
   g.y = (u32)state[1];

@@ -301,6 +301,24 @@ static void kebab_irq(void *target, void *refCon, void *nub, int source)
 			break;
 		}
 		if (intid == VIRTUAL_TIMER_INTID) {
+			/* Heartbeat: repaint the last band when the phase changes, so a
+			 * frozen screen means no timer interrupt is being delivered. */
+			{
+				volatile u32 *ticks = (volatile u32 *)(u64)(SCRATCH + 0x18);
+				volatile u32 *phase_slot = (volatile u32 *)(u64)(SCRATCH + 0x1c);
+				u32 n = *ticks + 1;
+				*ticks = n;
+				if (fb != 0) {
+					u32 colors[2] = { 0xffff0000u, 0xff00ff00u };
+					u64 pe = PE_STATE;
+					u64 band = (*(volatile u64 *)(u64)(pe + PE_VIDEO_ROWBYTES) *
+					    *(volatile u64 *)(u64)(pe + PE_VIDEO_HEIGHT)) >> 4;
+					if (band != 0) {
+						*phase_slot = n;
+						paint_band(fb, band, 15, colors[n & 1]);
+					}
+				}
+			}
 			if (fb != 0) {
 				u64 pe = PE_STATE;
 				u64 band = (*(volatile u64 *)(u64)(pe + PE_VIDEO_ROWBYTES) *
