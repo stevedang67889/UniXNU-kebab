@@ -1,5 +1,14 @@
 --- a/makedefs/MakeInc.def
 +++ b/makedefs/MakeInc.def
+@@ -667,7 +667,7 @@
+ 	-Wl,-headerpad,152
+ 
+ # LDFLAGS_KERNEL_SDK	= -L$(SDKROOT)/usr/local/lib/kernel -lfirehose_kernel
+-LDFLAGS_KERNEL_SDK	= -L$(SDKROOT)/usr/local/lib/kernel -L$(SDKROOT)/usr/local/lib/kernel/platform
++LDFLAGS_KERNEL_SDK	= -L$(KERNEL_SDKROOT)/usr/local/lib/kernel -L$(KERNEL_SDKROOT)/usr/local/lib/kernel/platform
+ 
+ LDFLAGS_KERNEL_RELEASE	=
+ LDFLAGS_KERNEL_DEVELOPMENT =
 @@ -911,8 +911,8 @@
  INCFLAGS_EXTERN	= -I$(SRCROOT)/EXTERNAL_HEADERS
  INCFLAGS_GEN	= -I$(SRCROOT)/$(COMPONENT) -I$(OBJROOT)/EXPORT_HDRS/$(COMPONENT)
