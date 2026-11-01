@@ -48,15 +48,6 @@ def find(lines, predicate, start=0):
     raise SystemExit('ShengUfs: expected source marker not found')
 
 
-def wrap(lines, start, end, stub=False):
-    """Put a KEBAB_UFS_PROBE_ONLY guard around lines[start..end]."""
-    insert = ['#endif']
-    if stub:
-        insert.append(STUB)
-    lines[end + 1:end + 1] = insert
-    lines[start:start] = [GUARD]
-
-
 def main():
     if not SOURCE.is_file():
         raise SystemExit(f'ShengUfs source missing: {SOURCE}')
@@ -75,12 +66,19 @@ def main():
         methods_end = find(lines, lambda line: line.startswith('// Ordered publication of the root windows.'), methods_start)
         publication_end = find(lines, lambda line: line.startswith('// Memory snapshot (native-ufs-probe=13)'), methods_end)
         root_start = find(lines, lambda line: line.startswith('bool NativeUfs::startRoot ('), publication_end)
-        root_end = find(lines, lambda line: line.strip() == '}', root_start + 1)
-        # Bottom-up so the earlier indices stay valid.
-        wrap(lines, root_start, root_end, stub=True)
-        wrap(lines, methods_end, publication_end - 1)
-        wrap(lines, methods_start, methods_end - 1)
-        wrap(lines, class_start, class_end)
+        root_end = find(lines, lambda line: line == '}', root_start + 1)
+        inserts = [
+            (class_start, [GUARD]),
+            (class_end + 1, ['#endif']),
+            (methods_start, [GUARD]),
+            (methods_end, ['#endif']),
+            (methods_end + 1, [GUARD]),
+            (publication_end, ['#endif']),
+            (root_start, [GUARD]),
+            (root_end + 1, ['#endif', STUB]),
+        ]
+        for index, block in sorted(inserts, key=lambda item: item[0], reverse=True):
+            lines[index:index] = block
         print('ShengUfs: block class and root publication compiled out under KEBAB_UFS_PROBE_ONLY')
     else:
         print('ShengUfs: probe-only guards already present')
