@@ -1,13 +1,13 @@
 #!/bin/bash
-# UFS for the macOS UniXNU workflow (component-based tree).
-#
-# Workflow pre_build input:
+# UFS for the macOS UniXNU workflow: component-based tree, probe-only build.
 #
 #   bash device/scripts/ufs-ci-pre-build.sh
 #
-# The framework ships the ShengUfs component (repository UniXNU/ShengUfs, pinned
-# revision, output build/sheng-ufs/libShengUfs.a) and the kernel script links it
-# when XNU_NATIVE_UFS=1.  Only the device repository has to select it.
+# ShengUfs is selected as the component the framework already pins.  Its block
+# class needs the sheng verified-root bundle, which kebab does not have yet, so
+# build-arm-driver.py is patched in the framework checkout to drop
+# -DNATIVE_VERIFIED_BLOCK: the transport and its diagnostics stay, the block
+# class and the VerifiedRoot/IOBlockStorageDevice references go.
 set -euo pipefail
 DEVICE=${UNIXNU_DEVICE:-$PWD/device}
 
@@ -26,14 +26,33 @@ if '"ShengUfs"' not in text:
     items = [item.strip() for item in match.group(1).split(',') if item.strip()]
     items.append('"ShengUfs"')
     text = text[:match.start()] + 'include = [' + ', '.join(items) + ']' + text[match.end():]
-if 'native-ufs-diagnostics=1' not in text:
-    text = text.replace('kernel_args = [\n  "-v",',
-                        'kernel_args = [\n  "-v",\n  "native-ufs-diagnostics=1",')
+for argument in ('native-ufs-diagnostics=1', 'native-ufs-probe=2'):
+    if argument not in text:
+        text = text.replace('kernel_args = [\n  "-v",',
+                            'kernel_args = [\n  "-v",\n  "%s",' % argument)
 board.write_text(text)
-print('board.toml: ShengUfs selected, native-ufs-diagnostics=1')
+print('board.toml: ShengUfs selected, native-ufs-diagnostics=1, native-ufs-probe=2')
 
 config = device / 'configs/kebab_defconfig'
 text = config.read_text().replace('CONFIG_XNU_NATIVE_UFS=n', 'CONFIG_XNU_NATIVE_UFS=y')
 config.write_text(text)
 print('defconfig: CONFIG_XNU_NATIVE_UFS=y')
+PY
+
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path('scripts/build-arm-driver.py')
+text = path.read_text()
+old = ("if component == 'NativeUfs':\n"
+       "    command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'), '-I', str(ROOT / 'drivers/VirtioMmioBlock'),\n"
+       "                '-DNATIVE_VERIFIED_BLOCK=1', '-DNATIVE_VERIFIED_BLOCK_MULTI_POLICY=1', '-mgeneral-regs-only']\n")
+new = ("if component == 'NativeUfs':\n"
+       "    # kebab bring-up: probe-only, no verified-root bundle yet.\n"
+       "    command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'), '-I', str(ROOT / 'drivers/VirtioMmioBlock'),\n"
+       "                '-mgeneral-regs-only']\n")
+if old not in text:
+    raise SystemExit('build-arm-driver.py NativeUfs branch changed; update the pre-build')
+path.write_text(text.replace(old, new))
+print('build-arm-driver.py: NativeUfs builds without NATIVE_VERIFIED_BLOCK')
 PY
