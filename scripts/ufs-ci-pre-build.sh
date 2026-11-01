@@ -43,7 +43,6 @@ print('board.toml: corecrypto archive entries dropped')
 series = device / 'patches/xnu/series'
 series.parent.mkdir(parents=True, exist_ok=True)
 series.write_text('arch:../../../patches/xnu/local-availability.patch\n'
-                   'arch:../../../patches/xnu/kernel-sdk-root.patch\n'
                    'arch:../../../patches/xnu/disabled-deferred-reclaim.patch\n'
                    'arch:../../../patches/xnu/non-apple-pmap-field.patch\n'
                    'arch:../../../patches/xnu/public-entitlements-header.patch\n'
