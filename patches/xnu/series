@@ -1,4 +1,4 @@
-arch:../../../../../patches/xnu/local-availability.patch
-arch:../../../../../patches/xnu/kernel-sdk-root.patch
+arch:../../../patches/xnu/local-availability.patch
+arch:../../../patches/xnu/kernel-sdk-root.patch
 component:XnuPrelink/patches/xnu-10063.141.1-security-init.patch
 component:XnuPrelink/patches/xnu-10063.141.1-sparse-index.patch
