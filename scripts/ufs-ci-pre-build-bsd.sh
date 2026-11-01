@@ -24,12 +24,7 @@ text = re.sub(r'^patch_series\s*=\s*\[.*?\]\s*$',
 text = re.sub(r'^config_fragments\s*=\s*\[.*?\]\s*$',
               'config_fragments = ["soc:configs/sm8250.config"]', text, count=1, flags=re.M)
 
-# The archive pass runs before the kernel pass, so the corecrypto archive
-# builder has no link.filelist yet. The defconfig's source corecrypto path
-# builds it in-tree; drop the archive entries.
-text = re.sub(r'^\s*"build-corecrypto-14\.py[^"]*",\n', '', text, flags=re.M)
 board.write_text(text)
-print('board.toml: BSD UFS series, corecrypto archives dropped')
 
 series = device / 'patches/xnu/series'
 series.parent.mkdir(parents=True, exist_ok=True)
