@@ -61,7 +61,7 @@ old = ("if component == 'NativeUfs':\n"
 new = ("if component == 'NativeUfs':\n"
        "    # kebab bring-up: probe-only, no verified-root bundle yet.\n"
        "    command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'), '-I', str(ROOT / 'drivers/VirtioMmioBlock'),\n"
-       "                '-mgeneral-regs-only']\n")
+       "                '-DKEBAB_UFS_PROBE_ONLY=1', '-mgeneral-regs-only']\n")
 if old not in text:
     raise SystemExit('build-arm-driver.py NativeUfs branch changed; update the pre-build')
 path.write_text(text.replace(old, new))

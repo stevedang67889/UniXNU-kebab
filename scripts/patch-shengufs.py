@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
-"""Build the pinned ShengUfs source probe-only (no verified-root bundle).
+"""Build the pinned ShengUfs source probe-only.
 
-The component recipe points here instead of straight at build-arm-driver.py:
-the transport's read path uses timerTicks() and native_ufs_read_ticks, which
-upstream keeps inside the NATIVE_VERIFIED_BLOCK guard.  With that guard off
-the compile fails, so move the two helpers out of it first.
+The component recipe points here instead of straight at build-arm-driver.py.
+Two source fixes are needed for a build without the sheng verified-root bundle:
+
+  * timerTicks()/native_ufs_read_ticks are declared inside the
+    NATIVE_VERIFIED_BLOCK guard but used by the transport's read path.
+  * NativeUfsBlock (the IOBlockStorageDevice subclass) references the original
+    IOStorageFamily ABI, which only the verified-root bundle provides. With
+    KEBAB_UFS_PROBE_ONLY the class, its methods, the root publication block
+    and NativeUfs::startRoot are compiled out; the probe path stays.
+
+Then build-arm-driver.py (switched to probe-only flags by the CI pre-build)
+compiles and archives the driver.
 """
 import shutil
 import subprocess
@@ -13,34 +21,81 @@ from pathlib import Path
 
 ROOT = Path.cwd()
 SOURCE = ROOT / 'drivers/ShengUfs/NativeUfs.cpp'
-OLD = ('#if defined(NATIVE_VERIFIED_BLOCK) && NATIVE_VERIFIED_BLOCK\n'
-       'volatile uint64_t native_ufs_verified_blocks = 0;\n'
-       '// Time spent hashing/verifying and reading from the UFS transport, in generic-timer ticks (diagnostic only).\n'
-       'volatile uint64_t native_ufs_verify_ticks = 0, native_ufs_read_ticks = 0;\n'
-       'static inline uint64_t timerTicks (void) {uint64_t v; __asm__ volatile ("isb\\n\\tmrs %0, cntpct_el0" : "=r" (v)); return v;}\n'
-       'volatile uint32_t native_ufs_integrity_failures = 0;\n')
-NEW = ('// Time spent hashing/verifying and reading from the UFS transport, in generic-timer ticks (diagnostic only).\n'
-       'volatile uint64_t native_ufs_verify_ticks = 0, native_ufs_read_ticks = 0;\n'
-       'static inline uint64_t timerTicks (void) {uint64_t v; __asm__ volatile ("isb\\n\\tmrs %0, cntpct_el0" : "=r" (v)); return v;}\n'
-       '#if defined(NATIVE_VERIFIED_BLOCK) && NATIVE_VERIFIED_BLOCK\n'
-       'volatile uint64_t native_ufs_verified_blocks = 0;\n'
-       'volatile uint32_t native_ufs_integrity_failures = 0;\n')
 
-if not SOURCE.is_file():
-    raise SystemExit(f'ShengUfs source missing: {SOURCE}')
-text = SOURCE.read_text()
-if OLD in text:
-    SOURCE.write_text(text.replace(OLD, NEW))
-    print('ShengUfs: tick helpers moved out of the NATIVE_VERIFIED_BLOCK guard')
-else:
-    print('ShengUfs: guard block already patched or different, source left unchanged')
+OLD_TICKS = ('#if defined(NATIVE_VERIFIED_BLOCK) && NATIVE_VERIFIED_BLOCK\n'
+             'volatile uint64_t native_ufs_verified_blocks = 0;\n'
+             '// Time spent hashing/verifying and reading from the UFS transport, in generic-timer ticks (diagnostic only).\n'
+             'volatile uint64_t native_ufs_verify_ticks = 0, native_ufs_read_ticks = 0;\n'
+             'static inline uint64_t timerTicks (void) {uint64_t v; __asm__ volatile ("isb\\n\\tmrs %0, cntpct_el0" : "=r" (v)); return v;}\n'
+             'volatile uint32_t native_ufs_integrity_failures = 0;\n')
+NEW_TICKS = ('// Time spent hashing/verifying and reading from the UFS transport, in generic-timer ticks (diagnostic only).\n'
+             'volatile uint64_t native_ufs_verify_ticks = 0, native_ufs_read_ticks = 0;\n'
+             'static inline uint64_t timerTicks (void) {uint64_t v; __asm__ volatile ("isb\\n\\tmrs %0, cntpct_el0" : "=r" (v)); return v;}\n'
+             '#if defined(NATIVE_VERIFIED_BLOCK) && NATIVE_VERIFIED_BLOCK\n'
+             'volatile uint64_t native_ufs_verified_blocks = 0;\n'
+             'volatile uint32_t native_ufs_integrity_failures = 0;\n')
 
-result = subprocess.run([sys.executable, str(ROOT / 'scripts/build-arm-driver.py'), 'ShengUfs'])
-if result.returncode:
-    log = ROOT / 'build/sheng-ufs/compile.log'
-    if log.is_file():
-        target = ROOT.parent / 'logs/component-ShengUfs-compile.log'
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(log, target)
-        print(f'ShengUfs: compile log copied to {target}')
-    raise SystemExit(result.returncode)
+GUARD = '#if !defined(KEBAB_UFS_PROBE_ONLY)'
+STUB = ('#if defined(KEBAB_UFS_PROBE_ONLY)\n'
+        'bool NativeUfs::startRoot (IOService *provider) { (void)provider; return false; }\n'
+        '#endif')
+
+
+def find(lines, predicate, start=0):
+    for index in range(start, len(lines)):
+        if predicate(lines[index]):
+            return index
+    raise SystemExit('ShengUfs: expected source marker not found')
+
+
+def wrap(lines, start, end, stub=False):
+    """Put a KEBAB_UFS_PROBE_ONLY guard around lines[start..end]."""
+    insert = ['#endif']
+    if stub:
+        insert.append(STUB)
+    lines[end + 1:end + 1] = insert
+    lines[start:start] = [GUARD]
+
+
+def main():
+    if not SOURCE.is_file():
+        raise SystemExit(f'ShengUfs source missing: {SOURCE}')
+    text = SOURCE.read_text()
+    if OLD_TICKS in text:
+        text = text.replace(OLD_TICKS, NEW_TICKS)
+        print('ShengUfs: tick helpers moved out of the NATIVE_VERIFIED_BLOCK guard')
+    elif NEW_TICKS not in text:
+        print('ShengUfs: tick helper block not recognised; left unchanged')
+
+    lines = text.split('\n')
+    if GUARD not in lines:
+        class_start = find(lines, lambda line: line.startswith('class NativeUfsBlock'))
+        class_end = find(lines, lambda line: 'OSDefineMetaClassAndStructors (NativeUfsBlock' in line, class_start)
+        methods_start = find(lines, lambda line: line.startswith('bool NativeUfsBlock::configure ('), class_end)
+        methods_end = find(lines, lambda line: line.startswith('// Ordered publication of the root windows.'), methods_start)
+        publication_end = find(lines, lambda line: line.startswith('// Memory snapshot (native-ufs-probe=13)'), methods_end)
+        root_start = find(lines, lambda line: line.startswith('bool NativeUfs::startRoot ('), publication_end)
+        root_end = find(lines, lambda line: line.strip() == '}', root_start + 1)
+        # Bottom-up so the earlier indices stay valid.
+        wrap(lines, root_start, root_end, stub=True)
+        wrap(lines, methods_end, publication_end - 1)
+        wrap(lines, methods_start, methods_end - 1)
+        wrap(lines, class_start, class_end)
+        print('ShengUfs: block class and root publication compiled out under KEBAB_UFS_PROBE_ONLY')
+    else:
+        print('ShengUfs: probe-only guards already present')
+    SOURCE.write_text('\n'.join(lines))
+
+    result = subprocess.run([sys.executable, str(ROOT / 'scripts/build-arm-driver.py'), 'ShengUfs'])
+    if result.returncode:
+        log = ROOT / 'build/sheng-ufs/compile.log'
+        if log.is_file():
+            target = ROOT.parent / 'logs/component-ShengUfs-compile.log'
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(log, target)
+            print(f'ShengUfs: compile log copied to {target}')
+        raise SystemExit(result.returncode)
+
+
+if __name__ == '__main__':
+    main()
