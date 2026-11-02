@@ -1,8 +1,16 @@
 diff --git a/osfmk/arm64/sleh.c b/osfmk/arm64/sleh.c
-index ff5296d..f39e241 100644
+index ff5296d..c2ce267 100644
 --- a/osfmk/arm64/sleh.c
 +++ b/osfmk/arm64/sleh.c
-@@ -2109,7 +2109,42 @@ sleh_irq(arm_saved_state_t *state)
+@@ -31,6 +31,7 @@
+ #include <arm/cpu_data_internal.h>
+ #include <arm/misc_protos.h>
+ #include <arm/thread.h>
++#include <arm/machine_cpu.h>
+ #include <arm/rtclock.h>
+ #include <arm/trap_internal.h> /* for IS_ARM_GDB_TRAP() et al */
+ #include <arm64/proc_reg.h>
+@@ -2109,7 +2110,42 @@ sleh_irq(arm_saved_state_t *state)
  	int preemption_level = sleh_get_preemption_level();
  #endif
  
@@ -45,7 +53,7 @@ index ff5296d..f39e241 100644
  	sleh_interrupt_handler_prologue(state, DBG_INTR_TYPE_OTHER);
  
  #if USE_APPLEARMSMP
-@@ -2122,8 +2157,9 @@ sleh_irq(arm_saved_state_t *state)
+@@ -2122,8 +2158,9 @@ sleh_irq(arm_saved_state_t *state)
  	    cdp->interrupt_source);
  #endif
  
