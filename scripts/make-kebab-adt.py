@@ -234,11 +234,14 @@ def main():
                         ('#address-cells', struct.pack('<I', 2)),
                         ('#size-cells', struct.pack('<I', 2)),
                         ('ranges', struct.pack('<QQQ', 0, ARMIO_BASE, ARMIO_SIZE))],
-             [node('intc', [('compatible', b'arm,gic-v3\0'),
-                            ('reg', struct.pack('<4Q',
-                                                GIC_DIST - ARMIO_BASE, GIC_DIST_SIZE,
-                                                GIC_REDIST - ARMIO_BASE, GIC_REDIST_SIZE)),
-                            ('redistributor-stride', struct.pack('<Q', GIC_REDIST_STRIDE))]),
+             [node('gic', [('compatible', b'arm,gic-v3\0'),
+                           ('interrupt-controller', b'master\0'),
+                           ('#interrupt-cells', struct.pack('<I', 3)),
+                           ('reg', struct.pack('<4Q',
+                                               GIC_DIST - ARMIO_BASE, GIC_DIST_SIZE,
+                                               GIC_REDIST - ARMIO_BASE, GIC_REDIST_SIZE)),
+                           ('virtual-timer-intid', struct.pack('<I', 27)),
+                           ('redistributor-stride', struct.pack('<I', GIC_REDIST_STRIDE))]),
               # UFS (0x01D84000) lies far below the arm-io window, so a child reg
               # offset would be negative.  Keep this class-matching node and put
               # the absolute register window on the root /kebab-ufs node below.
