@@ -2,29 +2,29 @@
 
 UniXNU device repository for the **OnePlus 8T (kebab, Qualcomm SM8250)**.
 
-## Status (2026-11-01)
+## Status (2026-11-02)
 
 Tested on a KB2000 (12+256, ColorOS 14, unlocked).
 
 | Stage | State |
 | --- | --- |
 | Mu-Silicium UEFI, menu, payload volume, DarwinBoot | working |
-| old-fw CI kernel build (`407db1a` + build fixes) | working; the uploaded artifact is `kernel-kebab-1` |
-| XNU entry, `kernel_bootstrap`, GIC stub | working; the GIC handler is installed and the first timer IRQ fires |
-| periodic timer IRQ | **not working**; the heartbeat band never advances, so an early allocator wait can still stop the boot |
-| `bsd_init` / `IOFindBSDRoot` | **not reached** on the tested images; the last kernel line is `Unable to find vm tag ?+z for btlog` |
-| BSD `kebab_ufs` driver | linked (`kebab_ufs_rootdev`); it will publish `ufsroot0` once root discovery runs |
-| UFS root (`rd=ufsroot0`) | blocked by the early kernel stop above, not by the UFS driver source |
+| old-fw CI kernel build | working; the fork's Actions are disabled, so builds run from the temporary `stevedang67889/UniXNU-ci` mirror |
+| source-level GICv3 (`pe_fiq.c` + `sleh_irq`) | ported from GFander's kebab tree and builds (`10063-kebab-gic-vtimer.patch`) |
+| hardware console | the source-GIC images currently show only colour bars, no text; the binary-GIC images still show the early log |
+| binary-GIC + UFS probe | `ufsprobe2` built, not yet flashed; it paints a green band when `IOFindBSDRoot` calls `kebab_ufs_rootdev` |
+| UFS root (`rd=ufsroot0`) | not confirmed on hardware yet |
 
-The old 2026-10-28 table described the `PE_init_iokit` bisection; that history is
-in `docs/bring-up.md`. The measured 2026-11-01 stop is earlier: the kernel
-prints the btlog tag warning and never reaches `bsd_init`.
+The earlier 2026-11-01 result was: binary GIC handler installed, first PPI-27
+IRQ fired, but the virtual timer did not repeat; the last visible line was
+`Unable to find vm tag ?+z for btlog`. The source-GIC path replaces the binary
+stub with GFander's `HAS_GIC_V3` / Group-1 `sleh_irq` design and is the active
+path now.
 
-The GIC stub reports handler-installed (magenta) and first-IRQ (cyan) bands, but
-no repeated timer tick. Re-arming `CNTV_TVAL_EL0`/`CNTV_CTL_EL0` after
-`rtclock_intr`, and even skipping `rtclock_intr`, both leave the screen static.
-The old `kernel-novc3` with the same GIC/FB/bring-up patch stops at the same
-point, so the next work is the timer/PPI-27 path, not the UFS driver.
+The framebuffer logger was made standalone for source-GIC builds (it maps
+`PE_state.video` through `ml_io_map` and also hooks `_kprintf`), but source-GIC
+images still show no text. The next diagnostic is a direct marker or UART, then
+`ufsprobe2` for the UFS root hook.
 
 ## Layout
 

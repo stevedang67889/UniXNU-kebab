@@ -219,7 +219,8 @@ def main():
         if name not in by_name:
             raise SystemExit(f'{args.kernel} has no {name}; it is not the kernel this patch targets')
 
-    hooks = {'_printf': 'kebab_fb_log', '_vprintf': 'kebab_fb_log_vprintf'}
+    hooks = {'_printf': 'kebab_fb_log', '_vprintf': 'kebab_fb_log_vprintf',
+             '_kprintf': 'kebab_fb_log'}
     site = by_name['_printf']
     if args.cave is not None:
         vmaddr, vmsize, _, filesize, initprot = segment_containing(args.cave)
@@ -230,7 +231,8 @@ def main():
         cave_start, cave_end = args.cave, vmaddr + min(vmsize, filesize)
     else:
         cave_start, cave_end = trailing_cave(data, site)
-    defines = {'PE_STATE': by_name['_PE_state'], 'SCRATCH': scratch_address()}
+    defines = {'PE_STATE': by_name['_PE_state'], 'SCRATCH': scratch_address(),
+               'ML_IO_MAP': by_name['_ml_io_map']}
     with tempfile.TemporaryDirectory() as tmp:
         code, load, symbols = assemble_c(STUB, cave_start, Path(tmp), defines,
                                          ['kebab_fb_log', 'kebab_fb_log_vprintf'], [str(font_dir)])

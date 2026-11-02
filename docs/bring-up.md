@@ -801,3 +801,43 @@ not the UFS driver.
    allocator can make progress; a UART on `0xA90000` would make this much faster.
 2. Re-test `rd=ufsroot0` and read the green/blue markers; the UFS driver and ADT
    node are already in place.
+
+
+## 2026-11-02: source GICv3 from GFander and the console gap
+
+GFander's current kebab tree moved to a **source-level** GICv3 implementation
+instead of a binary stub. The relevant reference is
+`patches/xnu-8796-kebab/0031-gic-vtimer-kebab.patch` in
+`GFander/UniXNU-kebab` (main `88da12a`): it defines `HAS_GIC_V3`, configures
+Group 1 non-secure in `pe_fiq.c`, and dispatches Group-1 interrupts directly in
+`sleh_irq` (virtual timer, SGI/IPI, other IRQs). That is the design we ported to
+XNU 10063 as `patches/xnu/10063-kebab-gic-vtimer.patch`.
+
+The patch adds:
+
+- `HAS_GIC_V3`, `KEBAB_VTIMER_INTID`, redistributor stride and the GICv3
+  register definitions to `pexpert/pexpert/arm64/BCM2837.h`;
+- Group-1 setup and the `virtual-timer-intid` / `redistributor-stride` DT
+  properties in `pe_fiq.c`, with a hardcoded `0x17A00000` / `0x17A60000`
+  fallback and absolute-or-window-relative `reg` handling;
+- the `sleh_irq` Group-1 branch, calling `rtclock_intr` for the virtual timer
+  and `cpu_signal_handler` for SGIs;
+- `kebab_vtimer_intid` in `protos.h`.
+
+CI builds succeeded for the source-GIC kernel
+(`af4c3262d6019892bbd94a8e22cf8cb8796332f97d42c0160eb6d677af5777bd`,
+`88ef88464c7fecedd71716a689776dc4c88d93cd6ca1ac6069c9912c471408b0`). The
+fork's Actions are disabled, so the builds run from the temporary
+`stevedang67889/UniXNU-ci` snapshot.
+
+On hardware the source-GIC images (`srcgic5`, `srcgic6`) show only cyan/blue/
+magenta colour bars and no text. The framebuffer logger was made standalone (it
+maps `PE_state.video` with `ml_io_map` and hooks `_kprintf`), so this is not the
+old binary-stub scratch dependency. The next step is a direct marker or UART to
+find where the source-GIC boot stops.
+
+In parallel, the binary-GIC `ufsprobe2` image was built. It applies the old GIC
+stub, keeps IRQs masked, and inserts a probe at the
+`_IOFindBSDRoot -> _kebab_ufs_rootdev` call. A green band means the BSD root hook
+is reached; the image has not been flashed yet.
+

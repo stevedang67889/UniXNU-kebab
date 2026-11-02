@@ -29,6 +29,11 @@ typedef unsigned char u8;
 #define LOG_STATE (SCRATCH + 0x20u)       /* x, y, initialised */
 
 /* PE_state_t: initialized (4 bytes), then PE_Video at offset 8. */
+#ifndef ML_IO_MAP
+#error "ML_IO_MAP must be supplied by the patcher"
+#endif
+typedef u64 (*ml_io_map_fn)(u64 phys, u64 size);
+
 #define PE_VIDEO_BASE 8u
 #define PE_VIDEO_ROWBYTES 16u
 #define PE_VIDEO_WIDTH 24u
@@ -257,21 +262,30 @@ __attribute__((used)) int kebab_fb_log_main(const char *fmt, const u64 *args)
   if (fmt == 0) {
     return 0;
   }
-  magic = vread64(SCRATCH + 0x10u);
-  if (magic != GIC_MAGIC) {
-    return 0;
-  }
-  fb = vread64(SCRATCH);
-  if (fb == 0) {
-    return 0;
-  }
-  g.base = (u8 *)(u64)fb;
   g.rb = vread32(PE_STATE + PE_VIDEO_ROWBYTES);
   g.w = vread32(PE_STATE + PE_VIDEO_WIDTH);
   g.h = vread32(PE_STATE + PE_VIDEO_HEIGHT);
   if (g.rb == 0 || g.w == 0 || g.h == 0 || g.rb < g.w * 4) {
     return 0;
   }
+  magic = vread64(SCRATCH + 0x10u);
+  fb = vread64(SCRATCH);
+  if (magic != GIC_MAGIC || fb == 0) {
+    /* The source-GIC boot does not run the binary GIC stub, so there is no
+     * scratch hand-over.  Map the GOP framebuffer ourselves. */
+    u64 phys = vread64(PE_STATE + PE_VIDEO_BASE);
+    if (phys == 0) {
+      return 0;
+    }
+    fb = ((ml_io_map_fn)ML_IO_MAP)(phys, (u64)g.rb * g.h);
+    if (fb == 0) {
+      return 0;
+    }
+    *(volatile u64 *)(u64)SCRATCH = fb;
+    *(volatile u64 *)(u64)(SCRATCH + 8u) = (u64)g.rb * g.h;
+    *(volatile u64 *)(u64)(SCRATCH + 16u) = GIC_MAGIC;
+  }
+  g.base = (u8 *)(u64)fb;
   if (state[2] == 0) {
     u64 total = (u64)g.rb * g.h;
     u64 i;

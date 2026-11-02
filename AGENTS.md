@@ -41,14 +41,22 @@ as a black panel.
 ## Current stage
 
 Firmware, menu, payload volume and DarwinBoot work. The old-fw CI kernel builds
-and reaches the early kernel log. The current stop is before `bsd_init`: the last
-line is `Unable to find vm tag ?+z for btlog`. The GIC handler is installed and
-the first PPI-27 IRQ fires, but no periodic timer tick follows; the old
-`kernel-novc3` with the same GIC/FB/bring-up patch stops at the same point.
+through a temporary mirror (`stevedang67889/UniXNU-ci`), because Actions on the
+fork are disabled.
 
-The BSD `kebab_ufs` driver is linked (`kebab_ufs_rootdev`), the ADT contains the
-root `/kebab-ufs` node, and `board.toml` documents the `rd=ufsroot0
-ufsroot=userdata rootrw=0` arguments. It has not been reached on hardware yet.
+The active interrupt path is now GFander's source-level GICv3 design:
+`HAS_GIC_V3` in the board header, Group-1 setup in `pe_fiq.c`, and the Group-1
+dispatch in `sleh_irq`. The patch is
+`patches/xnu/10063-kebab-gic-vtimer.patch`; it builds in CI.
+
+The source-GIC hardware images (`srcgic5`, `srcgic6`) still show only colour
+bars and no text, so the console/panic transport is unresolved. The binary-GIC
+`ufsprobe2` image is built but not flashed; it marks the
+`IOFindBSDRoot -> kebab_ufs_rootdev` call with a green band.
+
+The BSD `kebab_ufs` driver is linked, the ADT contains `/kebab-ufs`, and
+`board.toml` carries `rd=ufsroot0 ufsroot=userdata rootrw=0`. UFS root is not
+confirmed yet.
 
 Two firmware facts are easy to lose and expensive to rediscover:
 
