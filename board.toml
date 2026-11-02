@@ -129,12 +129,13 @@ size_mib = 64
 loader = "firmware"
 title = "kebab first boot: source 4K XNU to console"
 dram_size = "0xC0000000"   # one 3 GiB DRAM window at 0xC0000000
-panic_screen = false
+panic_screen = true
 # No entry probe: this is the baseline boot image.
 kernel_args = [
   "-v",
-  # For the UFS-root experiment add:
-  #   "rd=ufsroot0", "ufsroot=userdata", "rootrw=0",
+  "rd=ufsroot0",
+  "ufsroot=userdata",
+  "rootrw=0",
   "keepsyms=1",
   "kt_fixed_zones=120",
 ]

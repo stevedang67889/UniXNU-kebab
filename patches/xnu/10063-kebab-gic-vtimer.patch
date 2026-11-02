@@ -65,7 +65,7 @@ index ff5296d..c2ce267 100644
  	sleh_interrupt_handler_epilogue();
  #if MACH_ASSERT
 diff --git a/pexpert/arm/pe_fiq.c b/pexpert/arm/pe_fiq.c
-index 3ad743f..f30ce8a 100644
+index 3ad743f..ff9edc5 100644
 --- a/pexpert/arm/pe_fiq.c
 +++ b/pexpert/arm/pe_fiq.c
 @@ -3,6 +3,7 @@
@@ -136,7 +136,40 @@ index 3ad743f..f30ce8a 100644
  		vm_offset_t soc_base_phys = pe_arm_get_soc_base_phys();
  
  		uint64_t const gicd_base_prop = ((uint64_t const *) prop)[0];
-@@ -141,11 +179,22 @@ pe_init_fiq()
+@@ -103,15 +141,30 @@ pe_init_fiq()
+ 		uint64_t const gicr_base_prop = ((uint64_t const *) prop)[2];
+ 		uint64_t const gicr_size_prop = ((uint64_t const *) prop)[3];
+ 
++		/*
++		 * The ADT may carry either window-relative offsets (the format
++		 * pe_arm_init_interrupts documents) or the absolute GIC addresses
++		 * that the live kebab tree and older generators emit.  Accept both:
++		 * an offset is below the arm-io base, an absolute address is above it.
++		 */
++		uint64_t gicd_phys = gicd_base_prop;
++		uint64_t gicr_phys = gicr_base_prop;
++		if (soc_base_phys != 0 && gicd_phys < soc_base_phys) {
++			gicd_phys += soc_base_phys;
++		}
++		if (soc_base_phys != 0 && gicr_phys < soc_base_phys) {
++			gicr_phys += soc_base_phys;
++		}
++
+ 		// Find GICD base address
+-		gicd_base = ml_io_map(soc_base_phys + gicd_base_prop, gicd_size_prop);
++		gicd_base = ml_io_map(gicd_phys, gicd_size_prop);
+ 
+ 		if (!gicd_base) {
+ 			panic("%s: cannot map GICD region", __func__);
+ 		}
+ 
+ 		// Find GICR base address
+-		gicr_base = ml_io_map(soc_base_phys + gicr_base_prop, gicr_size_prop);
++		gicr_base = ml_io_map(gicr_phys, gicr_size_prop);
+ 
+ 		if (!gicr_base) {
+ 			panic("%s: cannot map GICR region", __func__);
+@@ -141,11 +194,22 @@ pe_init_fiq()
  		}
  	}
  
@@ -159,7 +192,7 @@ index 3ad743f..f30ce8a 100644
  
  	// Enable system register access
  	uint64_t icc_sre = __builtin_arm_rsr64("ICC_SRE_EL1");
-@@ -153,8 +202,12 @@ pe_init_fiq()
+@@ -153,8 +217,12 @@ pe_init_fiq()
  	__builtin_arm_wsr64("ICC_SRE_EL1", icc_sre);
  	__builtin_arm_isb(ISB_SY);
  
@@ -172,7 +205,7 @@ index 3ad743f..f30ce8a 100644
  	__builtin_arm_wsr64("ICC_PMR_EL1", 0xFF);
  
  	// Set EOI mode of this processor
-@@ -162,12 +215,24 @@ pe_init_fiq()
+@@ -162,12 +230,24 @@ pe_init_fiq()
  	icc_ctlr &= ~ICC_CTLR_EOIMODE;
  	__builtin_arm_wsr64("ICC_CTLR_EL1", icc_ctlr);
  
