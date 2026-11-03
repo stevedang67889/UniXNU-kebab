@@ -841,3 +841,32 @@ stub, keeps IRQs masked, and inserts a probe at the
 `_IOFindBSDRoot -> _kebab_ufs_rootdev` call. A green band means the BSD root hook
 is reached; the image has not been flashed yet.
 
+
+
+## 2026-11-03: into bsd_init, and the IOFindBSDRoot wait
+
+The binary-GIC path now reaches `bsd_init`. The probes and the ret patches
+found three deliberate stalls in sequence:
+
+- `platform_stall_panic_or_spin(PLATFORM_STALL_XNU_LOCATION_BSD_INIT)` is the
+  first instruction in `bsd_init`; it must return for anything else in
+  `bsd_init` to run.
+- `mac_policy_initmach` must return (the handoff already knew this).
+- `PE_lockdown_iokit` must return.
+
+With those three retted, the colour-band probe reaches band 14 (`bsd_init`)
+and the full late chain through `kperf_init_early`.
+
+Root is still blocked before `IOFindBSDRoot`. `IOFindBSDRoot` starts with
+`IOService::waitForMatchingService(..., 30 s)`, which needs a timer timeout;
+with the current interrupt path that timeout does not arrive. Replacing the
+whole `IOService::waitForMatchingService` with `return 0` breaks earlier IOKit
+and the kernel stops around band 3. Replacing only the `bl` at
+`0xfffffff007923194` (the call inside `IOFindBSDRoot`) with `mov x0,#0`
+produced the same early stop, so this needs a source-level change that moves
+the `rd=ufsroot0` hook ahead of the wait, followed by a CI kernel build.
+
+Next: patch `iokit/bsddev/IOKitBSDInit.cpp` so `rd=ufsroot0` calls
+`kebab_ufs_rootdev` before `waitForMatchingService`, rebuild through the
+`UniXNU-ci` mirror, and re-run the UFS probe.
+

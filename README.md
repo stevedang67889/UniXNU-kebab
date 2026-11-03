@@ -14,6 +14,8 @@ Tested on a KB2000 (12+256, ColorOS 14, unlocked).
 | hardware console | the source-GIC images currently show only colour bars, no text; the binary-GIC images still show the early log |
 | binary-GIC + UFS probe | `ufsprobe2` built, not yet flashed; it paints a green band when `IOFindBSDRoot` calls `kebab_ufs_rootdev` |
 | UFS root (`rd=ufsroot0`) | not confirmed on hardware yet |
+| `bsd_init` bring-up (2026-11-03) | reached; retting `platform_stall_panic_or_spin`, `mac_policy_initmach` and `PE_lockdown_iokit` gets the kernel into `bsd_init` |
+| `IOFindBSDRoot` | not reached yet; the `waitForMatchingService` skip needs a source patch, not a binary call-site patch |
 
 The earlier 2026-11-01 result was: binary GIC handler installed, first PPI-27
 IRQ fired, but the virtual timer did not repeat; the last visible line was

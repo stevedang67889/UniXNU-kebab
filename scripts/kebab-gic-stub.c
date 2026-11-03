@@ -352,6 +352,10 @@ u64 kebab_gic_stub(u64 ret)
 		*(volatile u64 *)(u64)(SCRATCH + 8) = band;
 		*(volatile u64 *)(u64)(SCRATCH + 16) = SCRATCH_MAGIC;
 		__asm__ volatile ("dsb sy" ::: "memory");
+#ifdef FB_ONLY
+		/* Source-GIC builds only need the framebuffer hand-over here. */
+		return ret;
+#endif
 	}
 	gicd = io_map(GICD_BASE, GICD_SIZE);
 	gicr = io_map(GICR_BASE, GICR_SIZE);

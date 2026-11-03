@@ -267,6 +267,7 @@ def main():
     parser.add_argument('--gicr-frames', metavar='N', type=int, default=GICR_FRAMES)
     parser.add_argument('--intid', metavar='INTID', type=int, default=VIRTUAL_TIMER_INTID)
     parser.add_argument('--dry-run', action='store_true', help='assemble and verify but do not write')
+    parser.add_argument('--fb-only', action='store_true', help='publish the framebuffer scratch and return without touching the GIC')
     args = parser.parse_args()
 
     if not args.kernel.is_file():
@@ -285,6 +286,11 @@ def main():
 
     site = hook_site(data, table)
     cave_start, cave_end = explicit_cave(args.cave) if args.cave is not None else trailing_cave(data, site)
+    if args.fb_only:
+        defines_fb_only = {'FB_ONLY': 1}
+    else:
+        defines_fb_only = {}
+
     defines = {
         'GICD_BASE': args.gicd_base,
         'GICR_BASE': args.gicr_base,
@@ -297,6 +303,7 @@ def main():
         'PE_STATE': by_name['_PE_state'],
         'SCRATCH': scratch_address(),
     }
+    defines.update(defines_fb_only)
     with tempfile.TemporaryDirectory() as tmp:
         code, load, entry = assemble_c(STUB, cave_start, Path(tmp), defines, 'kebab_gic_stub')
     if load < cave_start or load + len(code) > cave_end:
