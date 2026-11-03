@@ -2,7 +2,7 @@
 
 UniXNU device repository for the **OnePlus 8T (kebab, Qualcomm SM8250)**.
 
-## Status (2026-11-02)
+## Status (2026-11-03)
 
 Tested on a KB2000 (12+256, ColorOS 14, unlocked).
 
@@ -12,10 +12,10 @@ Tested on a KB2000 (12+256, ColorOS 14, unlocked).
 | old-fw CI kernel build | working; the fork's Actions are disabled, so builds run from the temporary `stevedang67889/UniXNU-ci` mirror |
 | source-level GICv3 (`pe_fiq.c` + `sleh_irq`) | ported from GFander's kebab tree and builds (`10063-kebab-gic-vtimer.patch`) |
 | hardware console | the source-GIC images currently show only colour bars, no text; the binary-GIC images still show the early log |
-| binary-GIC + UFS probe | `ufsprobe2` built, not yet flashed; it paints a green band when `IOFindBSDRoot` calls `kebab_ufs_rootdev` |
+| binary-GIC + UFS probe | `ufsprobe2` flashed; no green band 15 appeared, so `IOFindBSDRoot` is not reached |
 | UFS root (`rd=ufsroot0`) | not confirmed on hardware yet |
 | `bsd_init` bring-up (2026-11-03) | reached; retting `platform_stall_panic_or_spin`, `mac_policy_initmach` and `PE_lockdown_iokit` gets the kernel into `bsd_init` |
-| `IOFindBSDRoot` | not reached yet; the `waitForMatchingService` skip needs a source patch, not a binary call-site patch |
+| `IOFindBSDRoot` | not reached yet; the `waitForMatchingService` skip needs a source patch. Retting `loopattach`/`inittodr` made it worse (only bands 1-3) |
 
 The earlier 2026-11-01 result was: binary GIC handler installed, first PPI-27
 IRQ fired, but the virtual timer did not repeat; the last visible line was
@@ -25,8 +25,9 @@ path now.
 
 The framebuffer logger was made standalone for source-GIC builds (it maps
 `PE_state.video` through `ml_io_map` and also hooks `_kprintf`), but source-GIC
-images still show no text. The next diagnostic is a direct marker or UART, then
-`ufsprobe2` for the UFS root hook.
+images still show no text. The next diagnostic is a direct marker or UART.
+On the binary-GIC path the probes reach `bsd_init`; the current root blocker is
+the `IOFindBSDRoot` wait, which needs a source-level early hook.
 
 ## Layout
 

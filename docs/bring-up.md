@@ -839,7 +839,8 @@ find where the source-GIC boot stops.
 In parallel, the binary-GIC `ufsprobe2` image was built. It applies the old GIC
 stub, keeps IRQs masked, and inserts a probe at the
 `_IOFindBSDRoot -> _kebab_ufs_rootdev` call. A green band means the BSD root hook
-is reached; the image has not been flashed yet.
+is reached. The image was flashed; no green band 15 appeared, so `IOFindBSDRoot`
+is not reached.
 
 
 
@@ -869,4 +870,8 @@ the `rd=ufsroot0` hook ahead of the wait, followed by a CI kernel build.
 Next: patch `iokit/bsddev/IOKitBSDInit.cpp` so `rd=ufsroot0` calls
 `kebab_ufs_rootdev` before `waitForMatchingService`, rebuild through the
 `UniXNU-ci` mirror, and re-run the UFS probe.
+
+A later probe retted `loopattach` and `inittodr` before the root probes; the
+kernel then stopped around band 3, so that change was reverted. The current
+tree keeps only the three verified `bsd_init` rets.
 

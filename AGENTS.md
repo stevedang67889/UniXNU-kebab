@@ -50,9 +50,13 @@ dispatch in `sleh_irq`. The patch is
 `patches/xnu/10063-kebab-gic-vtimer.patch`; it builds in CI.
 
 The source-GIC hardware images (`srcgic5`, `srcgic6`) still show only colour
-bars and no text, so the console/panic transport is unresolved. The binary-GIC
-`ufsprobe2` image is built but not flashed; it marks the
-`IOFindBSDRoot -> kebab_ufs_rootdev` call with a green band.
+bars and no text, so the console/panic transport is unresolved.
+
+The binary-GIC path reaches `bsd_init` after retting
+`platform_stall_panic_or_spin`, `mac_policy_initmach` and `PE_lockdown_iokit`.
+`ufsprobe2` was flashed and did **not** show the green band 15, so
+`IOFindBSDRoot` is not reached. Retting `loopattach`/`inittodr` made the boot
+worse (only bands 1-3) and was reverted.
 
 The BSD `kebab_ufs` driver is linked, the ADT contains `/kebab-ufs`, and
 `board.toml` carries `rd=ufsroot0 ufsroot=userdata rootrw=0`. UFS root is not
