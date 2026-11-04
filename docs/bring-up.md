@@ -875,3 +875,32 @@ A later probe retted `loopattach` and `inittodr` before the root probes; the
 kernel then stopped around band 3, so that change was reverted. The current
 tree keeps only the three verified `bsd_init` rets.
 
+
+
+## 2026-11-04: the early-root build and the new-kernel regression
+
+The source-level early root hook is now in
+`patches/xnu/10063-kebab-ufs-early-root.patch` and in the pre-build series.
+It parses `rd=ufsroot0` at the top of `IOFindBSDRoot` and calls
+`kebab_ufs_rootdev` before `waitForMatchingService`.
+
+Two CI kernels were built through the mirror:
+
+- source-GIC + early-root (run `41827000358`);
+- a binary-GIC variant with the source-GIC patch removed (`no-srcgic`
+  branch, run `41829648091`).
+
+Both new kernels stop much earlier than the old `kernel-base-ci`: `early4`
+(new kernel + binary GIC + bring-up, no probes) reaches the GIC bands and
+shows band 4, but no bsd_init/root bands. `early6` with only two probes
+(`bsd_init -> IOFindBSDRoot` band 15, `IOFindBSDRoot -> rootdev` band 13)
+also shows only bands 1-4.
+
+The old `probe9` image (kernel-base-ci) still reaches band 14 on the same
+phone, so the hardware and the old kernel are fine. The regression is in the
+new kernel build, after the GIC setup and before bsd_init; the early-root hook
+has not been reached yet.
+
+Next: compare the new kernel's early bootstrap with `kernel-base-ci`, or get
+UART output before GIC. The early-root source patch remains staged for the
+next successful kernel.

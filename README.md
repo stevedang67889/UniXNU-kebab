@@ -15,7 +15,7 @@ Tested on a KB2000 (12+256, ColorOS 14, unlocked).
 | binary-GIC + UFS probe | `ufsprobe2` flashed; no green band 15 appeared, so `IOFindBSDRoot` is not reached |
 | UFS root (`rd=ufsroot0`) | not confirmed on hardware yet |
 | `bsd_init` bring-up (2026-11-03) | reached; retting `platform_stall_panic_or_spin`, `mac_policy_initmach` and `PE_lockdown_iokit` gets the kernel into `bsd_init` |
-| `IOFindBSDRoot` | not reached yet; the `waitForMatchingService` skip needs a source patch. Retting `loopattach`/`inittodr` made it worse (only bands 1-3) |
+| `IOFindBSDRoot` | not reached yet; the source-level early-root hook is staged, but the new CI kernel currently stops after the GIC bands and before `bsd_init` |
 
 The earlier 2026-11-01 result was: binary GIC handler installed, first PPI-27
 IRQ fired, but the virtual timer did not repeat; the last visible line was
