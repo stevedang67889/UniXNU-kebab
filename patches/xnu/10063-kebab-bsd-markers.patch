@@ -17,18 +17,18 @@ index bb558ee..77f1528 100644
 +	    PE_state.video.v_height == 0) {
 +		return;
 +	}
-+	u64 len = (u64)PE_state.video.v_rowBytes * PE_state.video.v_height;
-+	u64 fb = ml_io_map((vm_offset_t)PE_state.video.v_baseAddr, (vm_size_t)len);
-+	u64 bytes = len >> 4;
-+	u32 colors[8] = { 0xFFFFFFFFu, 0xFFFFFF00u, 0xFF00FF00u, 0xFF0000FFu,
++	uint64_t len = (uint64_t)PE_state.video.v_rowBytes * PE_state.video.v_height;
++	uint64_t fb = ml_io_map((vm_offset_t)PE_state.video.v_baseAddr, (vm_size_t)len);
++	uint64_t bytes = len >> 4;
++	uint32_t colors[8] = { 0xFFFFFFFFu, 0xFFFFFF00u, 0xFF00FF00u, 0xFF0000FFu,
 +		0xFFFF00FFu, 0xFF00FFFFu, 0xFFFF0000u, 0xFF808080u };
-+	volatile u32 *p;
++	volatile uint32_t *p;
 +
 +	if (fb == 0 || bytes < 4 || band < 0 || band >= 8) {
 +		return;
 +	}
-+	p = (volatile u32 *)(fb + bytes * (u64)band);
-+	for (u64 i = 0; i < bytes / 4; i++) {
++	p = (volatile uint32_t *)(fb + bytes * (uint64_t)band);
++	for (uint64_t i = 0; i < bytes / 4; i++) {
 +		p[i] = colors[band];
 +	}
 +	__asm__ volatile ("dsb sy" ::: "memory");
