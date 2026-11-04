@@ -1,0 +1,35 @@
+diff --git a/iokit/bsddev/IOKitBSDInit.cpp b/iokit/bsddev/IOKitBSDInit.cpp
+index 92142f7..332fad3 100644
+--- a/iokit/bsddev/IOKitBSDInit.cpp
++++ b/iokit/bsddev/IOKitBSDInit.cpp
+@@ -691,6 +691,30 @@ IOFindBSDRoot( char * rootName, unsigned int rootNameSize,
+ 
+ 	int xchar, dchar;
+ 
++#if defined(__arm64__)
++	/*
++	 * kebab: rd=ufsroot0 names a BSD disk that does not publish an IOMedia.
++	 * Resolve it before the IOBSD wait below; that wait needs a timer timeout
++	 * and the early bring-up kernel has no periodic timer yet.
++	 */
++	{
++		char earlyRd[kMaxBootVar];
++		if (PE_parse_boot_argn("rd", earlyRd, sizeof(earlyRd)) &&
++		    strcmp(earlyRd, "ufsroot0") == 0) {
++			int ufs_error = kebab_ufs_rootdev(root);
++			if (ufs_error) {
++				panic("IOFindBSDRoot: KEBAB UFS root %s unavailable: %d",
++				    earlyRd, ufs_error);
++			}
++			strlcpy(rootName, earlyRd, rootNameSize);
++			IOLog("BSD root: %s, major %d, minor %d\n", rootName,
++			    major(*root), minor(*root));
++			*oflags = 0;
++			return kIOReturnSuccess;
++		}
++	}
++#endif
++
+ 	// stall here for anyone matching on the IOBSD resource to finish (filesystems)
+ 	matching = IOService::serviceMatching(gIOResourcesKey);
+ 	assert(matching);
