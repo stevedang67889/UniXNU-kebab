@@ -1,0 +1,72 @@
+diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
+index bb558ee..77f1528 100644
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -203,6 +203,34 @@
+ #include <tests/xnupost.h>
+ #endif
+ 
++extern vm_offset_t ml_io_map(vm_offset_t phys_addr, vm_size_t size);
++
++/* Bring-up: paint one sixteenth of the GOP framebuffer from BSD context.
++ * This avoids the call-site probe stubs, whose ABI is fragile inside bsd_init. */
++static void
++kebab_bsd_mark(int band)
++{
++	if (PE_state.video.v_baseAddr == 0 || PE_state.video.v_rowBytes == 0 ||
++	    PE_state.video.v_height == 0) {
++		return;
++	}
++	u64 len = (u64)PE_state.video.v_rowBytes * PE_state.video.v_height;
++	u64 fb = ml_io_map((vm_offset_t)PE_state.video.v_baseAddr, (vm_size_t)len);
++	u64 bytes = len >> 4;
++	u32 colors[8] = { 0xFFFFFFFFu, 0xFFFFFF00u, 0xFF00FF00u, 0xFF0000FFu,
++		0xFFFF00FFu, 0xFF00FFFFu, 0xFFFF0000u, 0xFF808080u };
++	volatile u32 *p;
++
++	if (fb == 0 || bytes < 4 || band < 0 || band >= 8) {
++		return;
++	}
++	p = (volatile u32 *)(fb + bytes * (u64)band);
++	for (u64 i = 0; i < bytes / 4; i++) {
++		p[i] = colors[band];
++	}
++	__asm__ volatile ("dsb sy" ::: "memory");
++}
++
+ void * get_user_regs(thread_t);         /* XXX kludge for <machine/thread.h> */
+ void IOKitInitializeTime(void);         /* XXX */
+ void IOSleep(unsigned int);             /* XXX */
+@@ -487,6 +515,8 @@ bsd_init(void)
+ 		.p_csflags = CS_VALID,
+ 	};
+ 	struct task_ro_data kerntask_ro_data = { };
++
++	kebab_bsd_mark(0);
+ #if CONFIG_NETBOOT || CONFIG_IMAGEBOOT
+ 	boolean_t       netboot = FALSE;
+ #endif
+@@ -515,6 +545,7 @@ bsd_init(void)
+ 	/* Initialize kauth subsystem before instancing the first credential */
+ 	bsd_init_kprintf("calling kauth_init\n");
+ 	kauth_init();
++	kebab_bsd_mark(1);
+ 
+ 	/* kernel_task->proc = kernproc; */
+ 	set_bsdtask_info(kernel_task, (void *)kernproc);
+@@ -539,6 +570,7 @@ bsd_init(void)
+ 	kauth_cred_set(&kernproc_ro_data.p_ucred.__smr_ptr, vfs_context0.vc_ucred);
+ 	kernproc->p_proc_ro = proc_ro_alloc(kernproc, &kernproc_ro_data,
+ 	    kernel_task, &kerntask_ro_data);
++	kebab_bsd_mark(2);
+ 
+ 	/* give kernproc a name */
+ 	bsd_init_kprintf("calling process_name\n");
+@@ -883,6 +915,7 @@ bsd_init(void)
+ 
+ 		bsd_init_kprintf("calling setconf\n");
+ 		setconf();
++		kebab_bsd_mark(3);
+ #if CONFIG_NETBOOT
+ 		netboot = (mountroot == netboot_mountroot);
+ #endif

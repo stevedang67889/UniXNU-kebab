@@ -53,7 +53,8 @@ series.write_text('arch:../../../patches/xnu/local-availability.patch\n'
                    'arch:../../../patches/xnu/public-entitlements-header.patch\n'
                    'arch:../../../patches/xnu/published-freezer-condition.patch\n'
                    '10063-kern-exec-entitlements.patch\n'
-                   'kebab-ufs-10063.patch\n')
+                   'kebab-ufs-10063.patch\n'
+                   '10063-kebab-bsd-markers.patch\n')
 print('board.toml: NativeUfs selected, device series with local-availability')
 
 revision = subprocess.check_output(['git', '-C', str(device), 'rev-parse', 'HEAD'], text=True).strip()
