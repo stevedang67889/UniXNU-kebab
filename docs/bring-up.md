@@ -877,6 +877,7 @@ tree keeps only the three verified `bsd_init` rets.
 
 
 
+<<<<<<< Updated upstream
 ## 2026-11-04: the early-root build and the new-kernel regression
 
 The source-level early root hook is now in
@@ -904,3 +905,24 @@ has not been reached yet.
 Next: compare the new kernel's early bootstrap with `kernel-base-ci`, or get
 UART output before GIC. The early-root source patch remains staged for the
 next successful kernel.
+=======
+## 2026-11-04: no-early control and the probe-stub fragility
+
+- The `no-early` control kernel (no early-root patch, binary GIC, bring-up
+  rets) reaches `bsd_init`: a single probe on the
+  `_kernel_bootstrap_thread -> _bsd_init` call paints band 14.
+- Probes inserted at call sites **inside** `bsd_init` (`kminit`,
+  `IOKitBSDInit`, `loopattach`, `net_init_run`, `inittodr`, `IOFindBSDRoot`,
+  `kebab_ufs_rootdev`) stop the boot around the GIC bands. A single probe at
+  the `bsd_init` call site works, so the fragility is specific to the
+  bsd_init body, not the probe helper itself.
+- The framebuffer text logger also stays silent on the new kernel even with
+  the GIC stub scratch hand-over, so text logs are not available.
+- `10063-kebab-bsd-markers.patch` now paints hardcoded-framebuffer bands
+  10-13 directly from `bsd_init` (start, after `kauth_init`, after
+  `proc_ro_alloc`, after `setconf`) instead of using probe stubs. The CI
+  build for that is run `41861722320`.
+- Branches: `no-early` (control, no early-root), `no-srcgic` (binary-GIC
+  variant with the source-GIC patch removed). Main keeps the source-GIC and
+  early-root patches.
+>>>>>>> Stashed changes

@@ -53,10 +53,14 @@ The source-GIC hardware images (`srcgic5`, `srcgic6`) still show only colour
 bars and no text, so the console/panic transport is unresolved.
 
 The binary-GIC path reaches `bsd_init` after retting
-`platform_stall_panic_or_spin`, `mac_policy_initmach` and `PE_lockdown_iokit`.
-`ufsprobe2` was flashed and did **not** show the green band 15, so
-`IOFindBSDRoot` is not reached. Retting `loopattach`/`inittodr` made the boot
-worse (only bands 1-3) and was reverted.
+`platform_stall_panic_or_spin`, `mac_policy_initmach` and `PE_lockdown_iokit`;
+the no-early control kernel shows band 14. Probe stubs placed inside `bsd_init`
+stop the new kernel early (bands 1-3 only), and the framebuffer text logger
+stays silent on it, so observability currently comes from source-level band
+markers (`10063-kebab-bsd-markers.patch`, bands 10-13) being built in CI.
+`ufsprobe2` did **not** show the green band 15, so `IOFindBSDRoot` is not
+reached yet. Retting `loopattach`/`inittodr` made the boot worse and was
+reverted.
 
 The BSD `kebab_ufs` driver is linked, the ADT contains `/kebab-ufs`, and
 `board.toml` carries `rd=ufsroot0 ufsroot=userdata rootrw=0`. UFS root is not
