@@ -8,7 +8,7 @@
 set -euo pipefail
 DEVICE=${UNIXNU_DEVICE:-$PWD/device}
 
-sed -i 's/MACHINE_CONFIGS=BCM2837/MACHINE_CONFIGS=KEBAB/g' scripts/build-xnu-4k-baseline.sh
+sed -i '' 's/MACHINE_CONFIGS=BCM2837/MACHINE_CONFIGS=KEBAB/g' scripts/build-xnu-4k-baseline.sh
 python3 - "$DEVICE" <<'PY'
 import re
 import subprocess
