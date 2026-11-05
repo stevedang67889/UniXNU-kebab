@@ -8,6 +8,7 @@
 set -euo pipefail
 DEVICE=${UNIXNU_DEVICE:-$PWD/device}
 
+sed -i 's/MACHINE_CONFIGS=BCM2837/MACHINE_CONFIGS=KEBAB/g' scripts/build-xnu-4k-baseline.sh
 python3 - "$DEVICE" <<'PY'
 import re
 import subprocess
@@ -36,6 +37,7 @@ board.write_text(text)
 series = device / 'patches/xnu/series'
 series.parent.mkdir(parents=True, exist_ok=True)
 series.write_text('arch:../../../patches/xnu/local-availability.patch\n'
+                   '10063-kebab-machine-config.patch\n'
                    'arch:../../../patches/xnu/disabled-deferred-reclaim.patch\n'
                    'arch:../../../patches/xnu/non-apple-pmap-field.patch\n'
                    'arch:../../../patches/xnu/source-machine-layer.patch\n'
