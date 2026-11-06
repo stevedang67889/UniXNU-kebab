@@ -2,7 +2,7 @@
 import subprocess
 from pathlib import Path
 
-OBJ = 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837'
+OBJ = 'build/xnu/ios-obj/DEVELOPMENT_ARM64_KEBAB'
 
 
 def defined_names(paths, global_only):
@@ -25,12 +25,12 @@ def kernel_names(root, global_only=True):
         return defined_names([checkpoint], global_only)
     filelist = root / OBJ / 'link.filelist'
     if not filelist.is_file():
-        # KEBAB bring-up: the first machine-config pass has no BCM2837
-        # link.filelist yet.  Use the symbol list of the known-good 4 KiB
-        # kernel so the archive recipes can filter their own exports.
-        fallback = Path(__file__).with_name('kebab-xnu-symbols.txt')
-        if fallback.is_file():
-            return {line.strip() for line in fallback.read_text().splitlines() if line.startswith('_')}
+        # First KEBAB machine-config pass: there is no linked kernel or
+        # link.filelist yet, but the bootstrap pass has already produced the
+        # object files.  Read the symbols from those objects directly.
+        objects = sorted((root / OBJ).rglob('*.o'))
+        if objects:
+            return defined_names(objects, global_only)
         raise SystemExit('No XNU symbol names: run a kernel pass first (it writes link.filelist)')
     # A pass whose compile failed leaves its filelist naming objects it did not produce; the next pass rebuilds them and its
     # link sees them, so only the objects that exist are read here.
