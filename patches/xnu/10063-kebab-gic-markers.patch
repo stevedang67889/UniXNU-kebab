@@ -1,0 +1,86 @@
+diff --git a/pexpert/arm/pe_fiq.c b/pexpert/arm/pe_fiq.c
+index 0b5e1d9..91caf1e 100644
+--- a/pexpert/arm/pe_fiq.c
++++ b/pexpert/arm/pe_fiq.c
+@@ -23,6 +23,41 @@ SECURITY_READ_ONLY_LATE(uint32_t) kebab_vtimer_intid = KEBAB_VTIMER_INTID;
+ SECURITY_READ_ONLY_LATE(uint32_t) kebab_gicr_stride = GICR_PE_SIZE;
+ #endif
+ 
++#include <pexpert/pexpert.h>
++
++/* Bring-up marker: paint one sixteenth of the GOP framebuffer from the GIC
++ * setup path, so a CPU fault can be located without the binary stubs. */
++static void
++kfb_mark(int band)
++{
++	unsigned long rb = PE_state.video.v_rowBytes;
++	unsigned long h = PE_state.video.v_height;
++
++	if (rb == 0) {
++		rb = 0x1000;
++	}
++	if (h == 0) {
++		h = 2400;
++	}
++	uint64_t len = (uint64_t)rb * h;
++	uint64_t fb = ml_io_map(0x9C000000, (vm_size_t)len);
++	uint64_t bytes = len >> 4;
++	static const uint32_t colors[8] = {
++		0xFFFFFFFFu, 0xFFFFFF00u, 0xFF00FF00u, 0xFF0000FFu,
++		0xFFFF00FFu, 0xFF00FFFFu, 0xFFFF0000u, 0xFF808080u
++	};
++	volatile uint32_t *p;
++
++	if (fb == 0 || bytes < 4 || band < 8 || band >= 16) {
++		return;
++	}
++	p = (volatile uint32_t *)(fb + bytes * (uint64_t)(band - 8));
++	for (uint64_t i = 0; i < bytes / 4; i++) {
++		p[i] = colors[band - 8];
++	}
++	__asm__ volatile ("dsb sy" ::: "memory");
++}
++
+ static vm_offset_t gicd_base;
+ static vm_offset_t gicr_base;
+ static vm_offset_t gicr_size;
+@@ -77,6 +112,7 @@ find_gicr_pe_base()
+ void
+ pe_init_fiq()
+ {
++	kfb_mark(8);
+ 	int error;
+ 	DTEntry entry;
+ 
+@@ -180,8 +216,10 @@ pe_init_fiq()
+ 	}
+ 
+ gic_ready:
++	kfb_mark(9);
+ 	// Find the redistributor for this processor
+ 	vm_offset_t gicr_pe_base = find_gicr_pe_base();
++	kfb_mark(10);
+ 
+ 	// Mark this PE to be awake
+ 	uint32_t gicr_waker = gicr_read32(GICR_WAKER);
+@@ -219,10 +257,12 @@ gic_ready:
+ #endif
+ 
+ 	// Enable system register access
++	kfb_mark(11);
+ 	uint64_t icc_sre = __builtin_arm_rsr64("ICC_SRE_EL1");
+ 	icc_sre |= ICC_SRE_SRE;
+ 	__builtin_arm_wsr64("ICC_SRE_EL1", icc_sre);
+ 	__builtin_arm_isb(ISB_SY);
++	kfb_mark(12);
+ 
+ #if defined(KEBAB)
+ 	__builtin_arm_wsr64("ICC_BPR1_EL1", 0);
+@@ -231,6 +271,7 @@ gic_ready:
+ 	__builtin_arm_wsr64("ICC_BPR0_EL1", 0);
+ #endif
+ 	__builtin_arm_wsr64("ICC_PMR_EL1", 0xFF);
++	kfb_mark(13);
+ 
+ 	// Set EOI mode of this processor
+ 	uint64_t icc_ctlr = __builtin_arm_rsr64("ICC_CTLR_EL1");
