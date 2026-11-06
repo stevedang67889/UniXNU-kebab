@@ -835,3 +835,12 @@ fi
 # Expose the KEBAB object directory under the helper scripts' BCM2837 path.
 ln -sfn "$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_KEBAB" \
         "$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837" || true
+
+# The unixnu post-step still asks for the BCM2837 names; alias the KEBAB
+# kernel under them so the artifact step can find it.
+KOBJ="$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_KEBAB"
+for suffix in unstripped.noctf unstripped; do
+  [ -f "$KOBJ/mach.development.kebab.$suffix" ] && \
+    ln -sfn "$KOBJ/mach.development.kebab.$suffix" \
+            "$KOBJ/mach.development.bcm2837.$suffix"
+done
