@@ -125,6 +125,23 @@ index c66add1..71074e1 100644
  
  
  #
+diff --git a/osfmk/arm/pmap/pmap.c b/osfmk/arm/pmap/pmap.c
+index 7db00b6..f16b9cc 100644
+--- a/osfmk/arm/pmap/pmap.c
++++ b/osfmk/arm/pmap/pmap.c
+@@ -14943,3 +14943,12 @@ pmap_test_text_corruption_internal(pmap_paddr_t pa)
+ }
+ 
+ #endif /* DEVELOPMENT || DEBUG */
++
++#if SCHED_HYGIENE_DEBUG && (DEBUG || DEVELOPMENT)
++/* The public source omits the debug variant; check the urgent AST only. */
++bool
++pmap_pending_preemption(void)
++{
++	return _pmap_pending_preemption_real();
++}
++#endif /* SCHED_HYGIENE_DEBUG && (DEBUG || DEVELOPMENT) */
 diff --git a/osfmk/arm64/proc_reg.h b/osfmk/arm64/proc_reg.h
 index 70c5623..ef4fb85 100644
 --- a/osfmk/arm64/proc_reg.h
