@@ -1,9 +1,9 @@
 diff --git a/config/MASTER.arm64.kebab b/config/MASTER.arm64.kebab
 new file mode 100644
-index 0000000..77b9dfe
+index 0000000..c788ec7
 --- /dev/null
 +++ b/config/MASTER.arm64.kebab
-@@ -0,0 +1,97 @@
+@@ -0,0 +1,100 @@
 +#
 +# Mach Operating System
 +# Copyright (c) 1986 Carnegie-Mellon University
@@ -101,6 +101,9 @@ index 0000000..77b9dfe
 +options   CONFIG_UBSAN_MINIMAL		# <ubsan_minimal>
 +options   CONFIG_KERNEL_TBI	# <kernel_tbi>
 +options   CONFIG_KERNEL_TAGGING		# <kernel_tagging>
++
++options   NOS_ARM_ASM
++options   NOS_ARM_PMAP
 diff --git a/makedefs/MakeInc.def b/makedefs/MakeInc.def
 index c66add1..71074e1 100644
 --- a/makedefs/MakeInc.def
