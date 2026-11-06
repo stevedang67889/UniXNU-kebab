@@ -1,15 +1,14 @@
 diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
-index bb558ee..a19920a 100644
+index 434dc8c..0b22272 100644
 --- a/bsd/kern/bsd_init.c
 +++ b/bsd/kern/bsd_init.c
-@@ -505,7 +505,9 @@ bsd_init(void)
- 
+@@ -535,7 +535,8 @@ bsd_init(void)
  	throttle_init();
+ 	kebab_bsd_mark(14);
  
 -	printf(copyright);
-+	/* Bring-up: no serial or video console exists at bsd_init, and the
-+	 * copyright printf blocks there.  Skip it; the real console is wired
-+	 * once the board display driver is up. */
++	/* Bring-up: no serial or video console exists at bsd_init; skip the
++	 * blocking copyright printf. */
  
  #if CONFIG_DEV_KMEM
  	bsd_init_kprintf("calling dev_kmem_init\n");
