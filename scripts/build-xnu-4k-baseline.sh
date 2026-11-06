@@ -832,7 +832,6 @@ if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ] && [ "$CRYPTO_BOOTSTRAP_MODE" = sourc
     build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped
 fi
 
-# The framework helper scripts still key on the BCM2837 object path; expose the
-# KEBAB build there so their compile records resolve.
+# Expose the KEBAB object directory under the helper scripts' BCM2837 path.
 ln -sfn "$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_KEBAB" \
         "$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837" || true
