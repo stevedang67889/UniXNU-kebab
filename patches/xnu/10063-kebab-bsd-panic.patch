@@ -1,0 +1,58 @@
+diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
+index bb558ee..f7f5de5 100644
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -203,6 +203,18 @@
+ #include <tests/xnupost.h>
+ #endif
+ 
++/* Bring-up: panic at a selected BSD init stage.  The stage is chosen with
++ * the kebabbsd= boot argument so one kernel can be tested at several points. */
++static void
++kebab_bsd_panic(int stage)
++{
++	int want = 0;
++
++	if (PE_parse_boot_argn("kebabbsd", &want, sizeof(want)) && want == stage) {
++		panic("KEBAB BSD stage %d", stage);
++	}
++}
++
+ void * get_user_regs(thread_t);         /* XXX kludge for <machine/thread.h> */
+ void IOKitInitializeTime(void);         /* XXX */
+ void IOSleep(unsigned int);             /* XXX */
+@@ -487,6 +499,8 @@ bsd_init(void)
+ 		.p_csflags = CS_VALID,
+ 	};
+ 	struct task_ro_data kerntask_ro_data = { };
++
++	kebab_bsd_panic(1);
+ #if CONFIG_NETBOOT || CONFIG_IMAGEBOOT
+ 	boolean_t       netboot = FALSE;
+ #endif
+@@ -515,6 +529,7 @@ bsd_init(void)
+ 	/* Initialize kauth subsystem before instancing the first credential */
+ 	bsd_init_kprintf("calling kauth_init\n");
+ 	kauth_init();
++	kebab_bsd_panic(2);
+ 
+ 	/* kernel_task->proc = kernproc; */
+ 	set_bsdtask_info(kernel_task, (void *)kernproc);
+@@ -539,6 +554,7 @@ bsd_init(void)
+ 	kauth_cred_set(&kernproc_ro_data.p_ucred.__smr_ptr, vfs_context0.vc_ucred);
+ 	kernproc->p_proc_ro = proc_ro_alloc(kernproc, &kernproc_ro_data,
+ 	    kernel_task, &kerntask_ro_data);
++	kebab_bsd_panic(3);
+ 
+ 	/* give kernproc a name */
+ 	bsd_init_kprintf("calling process_name\n");
+@@ -882,7 +898,9 @@ bsd_init(void)
+ 		int err;
+ 
+ 		bsd_init_kprintf("calling setconf\n");
++		kebab_bsd_panic(4);
+ 		setconf();
++		kebab_bsd_panic(5);
+ #if CONFIG_NETBOOT
+ 		netboot = (mountroot == netboot_mountroot);
+ #endif
