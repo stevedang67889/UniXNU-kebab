@@ -49,6 +49,7 @@ series = device / 'patches/xnu/series'
 series.parent.mkdir(parents=True, exist_ok=True)
 series.write_text('arch:../../../patches/xnu/local-availability.patch\n'
                    '10063-kebab-machine-config.patch\n'
+                   '10063-kebab-bingic-header.patch\n'
                    'arch:../../../patches/xnu/disabled-deferred-reclaim.patch\n'
                    'arch:../../../patches/xnu/non-apple-pmap-field.patch\n'
                    'arch:../../../patches/xnu/source-machine-layer.patch\n'

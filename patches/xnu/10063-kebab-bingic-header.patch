@@ -1,0 +1,12 @@
+diff --git a/pexpert/pexpert/arm64/KEBAB.h b/pexpert/pexpert/arm64/KEBAB.h
+index f7c1503..6928f98 100644
+--- a/pexpert/pexpert/arm64/KEBAB.h
++++ b/pexpert/pexpert/arm64/KEBAB.h
+@@ -14,7 +14,6 @@
+ 
+ /* The SM8250 uses a GICv3; pe_fiq.c and sleh_irq take the KEBAB path. */
+ #define KEBAB 1
+-#define HAS_GIC_V3 1
+ #define KEBAB_VTIMER_INTID 27
+ #define KEBAB_IPI_SGI 1
+ #define GIC_SPURIOUS_IRQ 1023

@@ -28,7 +28,8 @@ def kernel_names(root, global_only=True):
         # First KEBAB machine-config pass: there is no linked kernel or
         # link.filelist yet, but the bootstrap pass has already produced the
         # object files.  Read the symbols from those objects directly.
-        objects = sorted((root / OBJ).rglob('*.o'))
+        objects = sorted(o for o in (root / OBJ).rglob('*.o')
+                         if o.name not in ('genassym.o',))
         if objects:
             return defined_names(objects, global_only)
         raise SystemExit('No XNU symbol names: run a kernel pass first (it writes link.filelist)')
