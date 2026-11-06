@@ -304,6 +304,9 @@ def main():
         'SCRATCH': scratch_address(),
     }
     defines.update(defines_fb_only)
+    for sym, key in (('_kebab_fb_va', 'KEBAB_FB_VA'), ('_kebab_fb_band', 'KEBAB_FB_BAND')):
+        if sym in by_name:
+            defines[key] = by_name[sym]
     with tempfile.TemporaryDirectory() as tmp:
         code, load, entry = assemble_c(STUB, cave_start, Path(tmp), defines, 'kebab_gic_stub')
     if load < cave_start or load + len(code) > cave_end:

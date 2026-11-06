@@ -1,38 +1,30 @@
 diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
-index bb558ee..4fe4bbd 100644
+index bb558ee..15cd001 100644
 --- a/bsd/kern/bsd_init.c
 +++ b/bsd/kern/bsd_init.c
-@@ -203,6 +203,39 @@
+@@ -203,6 +203,31 @@
  #include <tests/xnupost.h>
  #endif
  
-+extern vm_offset_t ml_io_map(vm_offset_t phys_addr, vm_size_t size);
++/* Filled by the GIC stub once it maps the GOP framebuffer; the BSD markers
++ * paint directly through these values, so they never call ml_io_map. */
++uint64_t kebab_fb_va = 0;
++uint64_t kebab_fb_band = 0;
 +
-+/* Bring-up: paint a band on the GOP framebuffer from BSD context.  The
-+ * physical base is the board splash constant; geometry falls back to the
-+ * known 1080x2400 panel when PE_state.video is not filled in yet. */
 +static void
 +kebab_bsd_mark(int band)
 +{
-+	unsigned long rb = PE_state.video.v_rowBytes;
-+	unsigned long h = PE_state.video.v_height;
-+
-+	if (rb == 0) {
-+		rb = 0x1000;
-+	}
-+	if (h == 0) {
-+		h = 2400;
-+	}
-+	uint64_t len = (uint64_t)rb * h;
-+	uint64_t fb = ml_io_map(0x9C000000, (vm_size_t)len);
-+	uint64_t bytes = len >> 4;
-+	uint32_t colors[4] = { 0xFFFFFFFFu, 0xFFFFFF00u, 0xFF00FF00u, 0xFF0000FFu };
++	uint64_t bytes;
++	static const uint32_t colors[4] = {
++		0xFFFFFFFFu, 0xFFFFFF00u, 0xFF00FF00u, 0xFF0000FFu
++	};
 +	volatile uint32_t *p;
 +
-+	if (fb == 0 || bytes < 4 || band < 10 || band >= 14) {
++	if (band < 10 || band >= 14 || kebab_fb_va == 0 || kebab_fb_band == 0) {
 +		return;
 +	}
-+	p = (volatile uint32_t *)(fb + bytes * (uint64_t)(band - 10));
++	bytes = kebab_fb_band;
++	p = (volatile uint32_t *)(kebab_fb_va + bytes * (uint64_t)(band - 10));
 +	for (uint64_t i = 0; i < bytes / 4; i++) {
 +		p[i] = colors[band - 10];
 +	}
@@ -42,7 +34,7 @@ index bb558ee..4fe4bbd 100644
  void * get_user_regs(thread_t);         /* XXX kludge for <machine/thread.h> */
  void IOKitInitializeTime(void);         /* XXX */
  void IOSleep(unsigned int);             /* XXX */
-@@ -487,6 +520,8 @@ bsd_init(void)
+@@ -487,6 +512,8 @@ bsd_init(void)
  		.p_csflags = CS_VALID,
  	};
  	struct task_ro_data kerntask_ro_data = { };
@@ -51,7 +43,7 @@ index bb558ee..4fe4bbd 100644
  #if CONFIG_NETBOOT || CONFIG_IMAGEBOOT
  	boolean_t       netboot = FALSE;
  #endif
-@@ -515,6 +550,7 @@ bsd_init(void)
+@@ -515,6 +542,7 @@ bsd_init(void)
  	/* Initialize kauth subsystem before instancing the first credential */
  	bsd_init_kprintf("calling kauth_init\n");
  	kauth_init();
@@ -59,7 +51,7 @@ index bb558ee..4fe4bbd 100644
  
  	/* kernel_task->proc = kernproc; */
  	set_bsdtask_info(kernel_task, (void *)kernproc);
-@@ -539,6 +575,7 @@ bsd_init(void)
+@@ -539,6 +567,7 @@ bsd_init(void)
  	kauth_cred_set(&kernproc_ro_data.p_ucred.__smr_ptr, vfs_context0.vc_ucred);
  	kernproc->p_proc_ro = proc_ro_alloc(kernproc, &kernproc_ro_data,
  	    kernel_task, &kerntask_ro_data);
@@ -67,7 +59,7 @@ index bb558ee..4fe4bbd 100644
  
  	/* give kernproc a name */
  	bsd_init_kprintf("calling process_name\n");
-@@ -883,6 +920,7 @@ bsd_init(void)
+@@ -883,6 +912,7 @@ bsd_init(void)
  
  		bsd_init_kprintf("calling setconf\n");
  		setconf();

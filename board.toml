@@ -138,7 +138,6 @@ kernel_args = [
   "rootrw=0",
   "keepsyms=1",
   "kt_fixed_zones=120",
-  "kebabbsd=1",
 ]
 
 # OnePlus ABL on kebab: header v2 / 4096-byte pages. "fastboot boot" is refused by

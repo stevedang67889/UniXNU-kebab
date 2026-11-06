@@ -351,6 +351,10 @@ u64 kebab_gic_stub(u64 ret)
 		*(volatile u64 *)(u64)(SCRATCH + 0) = fb;
 		*(volatile u64 *)(u64)(SCRATCH + 8) = band;
 		*(volatile u64 *)(u64)(SCRATCH + 16) = SCRATCH_MAGIC;
+#ifdef KEBAB_FB_VA
+		*(volatile u64 *)(u64)(KEBAB_FB_VA) = fb;
+		*(volatile u64 *)(u64)(KEBAB_FB_BAND) = band;
+#endif
 		__asm__ volatile ("dsb sy" ::: "memory");
 #ifdef FB_ONLY
 		/* Source-GIC builds only need the framebuffer hand-over here. */
