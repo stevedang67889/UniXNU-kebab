@@ -1,0 +1,15 @@
+diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
+index bb558ee..a19920a 100644
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -505,7 +505,9 @@ bsd_init(void)
+ 
+ 	throttle_init();
+ 
+-	printf(copyright);
++	/* Bring-up: no serial or video console exists at bsd_init, and the
++	 * copyright printf blocks there.  Skip it; the real console is wired
++	 * once the board display driver is up. */
+ 
+ #if CONFIG_DEV_KMEM
+ 	bsd_init_kprintf("calling dev_kmem_init\n");
