@@ -1,8 +1,8 @@
 diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
-index bb558ee..801154c 100644
+index bb558ee..434dc8c 100644
 --- a/bsd/kern/bsd_init.c
 +++ b/bsd/kern/bsd_init.c
-@@ -203,6 +203,32 @@
+@@ -203,6 +203,33 @@
  #include <tests/xnupost.h>
  #endif
  
@@ -15,9 +15,10 @@ index bb558ee..801154c 100644
 +kebab_bsd_mark(int band)
 +{
 +	uint64_t bytes;
++	/* Index = band - 10; avoid the GIC white/blue/magenta palette. */
 +	static const uint32_t colors[8] = {
-+		0xFFFFFFFFu, 0xFFFFFF00u, 0xFF00FF00u, 0xFF0000FFu,
-+		0xFFFF00FFu, 0xFF00FFFFu, 0xFFFF0000u, 0xFF808080u
++		0xFFFFFFFFu, 0xFF00FF00u, 0xFFFFFF00u, 0xFF00FFFFu,
++		0xFFFF0000u, 0xFFFF8000u, 0xFF800000u, 0xFF808080u
 +	};
 +	volatile uint32_t *p;
 +
@@ -35,7 +36,7 @@ index bb558ee..801154c 100644
  void * get_user_regs(thread_t);         /* XXX kludge for <machine/thread.h> */
  void IOKitInitializeTime(void);         /* XXX */
  void IOSleep(unsigned int);             /* XXX */
-@@ -487,6 +513,8 @@ bsd_init(void)
+@@ -487,6 +514,8 @@ bsd_init(void)
  		.p_csflags = CS_VALID,
  	};
  	struct task_ro_data kerntask_ro_data = { };
@@ -44,7 +45,7 @@ index bb558ee..801154c 100644
  #if CONFIG_NETBOOT || CONFIG_IMAGEBOOT
  	boolean_t       netboot = FALSE;
  #endif
-@@ -504,6 +532,7 @@ bsd_init(void)
+@@ -504,6 +533,7 @@ bsd_init(void)
  #endif
  
  	throttle_init();
@@ -52,7 +53,7 @@ index bb558ee..801154c 100644
  
  	printf(copyright);
  
-@@ -515,6 +544,7 @@ bsd_init(void)
+@@ -515,6 +545,7 @@ bsd_init(void)
  	/* Initialize kauth subsystem before instancing the first credential */
  	bsd_init_kprintf("calling kauth_init\n");
  	kauth_init();
@@ -60,7 +61,7 @@ index bb558ee..801154c 100644
  
  	/* kernel_task->proc = kernproc; */
  	set_bsdtask_info(kernel_task, (void *)kernproc);
-@@ -539,6 +569,7 @@ bsd_init(void)
+@@ -539,6 +570,7 @@ bsd_init(void)
  	kauth_cred_set(&kernproc_ro_data.p_ucred.__smr_ptr, vfs_context0.vc_ucred);
  	kernproc->p_proc_ro = proc_ro_alloc(kernproc, &kernproc_ro_data,
  	    kernel_task, &kerntask_ro_data);
@@ -68,7 +69,7 @@ index bb558ee..801154c 100644
  
  	/* give kernproc a name */
  	bsd_init_kprintf("calling process_name\n");
-@@ -883,6 +914,7 @@ bsd_init(void)
+@@ -883,6 +915,7 @@ bsd_init(void)
  
  		bsd_init_kprintf("calling setconf\n");
  		setconf();
