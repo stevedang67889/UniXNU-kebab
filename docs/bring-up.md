@@ -926,3 +926,24 @@ next successful kernel.
   variant with the source-GIC patch removed). Main keeps the source-GIC and
   early-root patches.
 >>>>>>> Stashed changes
+
+
+## 2026-11-07: KEBAB machine config, binary GIC and the BSD marker wall
+
+- The KEBAB machine config (`10063-kebab-machine-config.patch`) now builds:
+  `MASTER.arm64.kebab`, `KEBAB.h`, `MakeInc.def`, `board_config.h`,
+  `proc_reg.h`, the source asm/pmap options and `pmap_pending_preemption`.
+- With the source-GIC patch removed and the binary GIC stub added, the kernel
+  reaches `bsd_init` (band 14). The source-GIC build still stops before
+  `pe_init_fiq` with 900e, so the machine config is not the blocker there.
+- `native-4k-user-abi.patch` is now in the series; it did not change the
+  `bsd_init` stop.
+- Binary probe stubs placed inside `bsd_init` still stop the boot early
+  (bands 1-3). Instead the GIC stub publishes the mapped framebuffer VA and
+  bytes-per-band into `_kebab_fb_va`/`_kebab_fb_band`, and
+  `10063-kebab-bsd-markers.patch` paints bands directly from `bsd_init`.
+- Markers observed: start (white) and after `throttle_init` (red). Skipping
+  the blocking `printf(copyright)` moved the stop past printf; the next marker
+  is placed just before `kauth_init` and is pending a hardware test.
+- Branches: `kebab-cfg` (source GIC + markers), `kebab-cfg-bingic`
+  (binary GIC + 4K runtime policy + markers), `no-early`, `no-srcgic`.

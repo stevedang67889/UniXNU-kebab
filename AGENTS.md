@@ -52,12 +52,13 @@ dispatch in `sleh_irq`. The patch is
 The source-GIC hardware images (`srcgic5`, `srcgic6`) still show only colour
 bars and no text, so the console/panic transport is unresolved.
 
-The binary-GIC path reaches `bsd_init` after retting
-`platform_stall_panic_or_spin`, `mac_policy_initmach` and `PE_lockdown_iokit`;
-the no-early control kernel shows band 14. Probe stubs placed inside `bsd_init`
-stop the new kernel early (bands 1-3 only), and the framebuffer text logger
-stays silent on it, so observability currently comes from source-level band
-markers (`10063-kebab-bsd-markers.patch`, bands 10-13) being built in CI.
+The KEBAB machine config builds and, with the binary GIC stub, reaches
+`bsd_init` (band 14). Source framebuffer markers (`10063-kebab-bsd-markers.patch`)
+paint through the framebuffer VA that the GIC stub exports into
+`_kebab_fb_va`/`_kebab_fb_band`; they show the `bsd_init` start and the point
+after `throttle_init`, and the boot stops before `kauth_init`. Probe stubs
+inside `bsd_init` still stop the boot early and are not usable. The source-GIC
+path stops before `pe_init_fiq` on the KEBAB config (900e).
 `ufsprobe2` did **not** show the green band 15, so `IOFindBSDRoot` is not
 reached yet. Retting `loopattach`/`inittodr` made the boot worse and was
 reverted.

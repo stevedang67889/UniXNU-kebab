@@ -2,7 +2,7 @@
 
 UniXNU device repository for the **OnePlus 8T (kebab, Qualcomm SM8250)**.
 
-## Status (2026-11-04)
+## Status (2026-11-07)
 
 Tested on a KB2000 (12+256, ColorOS 14, unlocked).
 
