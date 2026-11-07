@@ -12,10 +12,10 @@ index 19b4065..4f8203d 100644
  bsd/dev/unix_startup.c			standard
 diff --git a/bsd/dev/kebab_ufs.c b/bsd/dev/kebab_ufs.c
 new file mode 100644
-index 0000000..1c0e93a
+index 0000000..eb27742
 --- /dev/null
 +++ b/bsd/dev/kebab_ufs.c
-@@ -0,0 +1,886 @@
+@@ -0,0 +1,908 @@
 +/*
 + * KEBAB internal UFS root device (read-only).
 + *
@@ -895,6 +895,28 @@ index 0000000..1c0e93a
 +		su.init_error = kebab_ufs_init();
 +	}
 +	int error = su.init_error;
++	/* One visible result colour: green ok, red ENXIO, orange ENOMEM,
++	 * yellow EINVAL, cyan EAGAIN, magenta anything else. */
++	switch (error) {
++	case 0:
++		kebab_ufs_mark(0, 0xFF00FF00u);
++		break;
++	case ENXIO:
++		kebab_ufs_mark(0, 0xFFFF0000u);
++		break;
++	case ENOMEM:
++		kebab_ufs_mark(0, 0xFFFF8000u);
++		break;
++	case EINVAL:
++		kebab_ufs_mark(0, 0xFFFFFF00u);
++		break;
++	case EAGAIN:
++		kebab_ufs_mark(0, 0xFF00FFFFu);
++		break;
++	default:
++		kebab_ufs_mark(0, 0xFFFF00FFu);
++		break;
++	}
 +	if (!error) {
 +		*dev = su.bdev;
 +	}
