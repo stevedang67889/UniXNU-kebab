@@ -1,54 +1,51 @@
 diff --git a/iokit/bsddev/IOKitBSDInit.cpp b/iokit/bsddev/IOKitBSDInit.cpp
-index 92142f7..332fad3 100644
+index 92142f7..c6eaad2 100644
 --- a/iokit/bsddev/IOKitBSDInit.cpp
 +++ b/iokit/bsddev/IOKitBSDInit.cpp
-@@ -691,6 +691,50 @@ IOFindBSDRoot( char * rootName, unsigned int rootNameSize,
+@@ -691,6 +691,47 @@ IOFindBSDRoot( char * rootName, unsigned int rootNameSize,
  
  	int xchar, dchar;
  
 +#if defined(__arm64__)
 +	/*
 +	 * kebab: rd=ufsroot0 names a BSD disk that does not publish an IOMedia.
-+	 * Resolve it before the IOBSD wait below; that wait needs a timer timeout
-+	 * and the early bring-up kernel has no periodic timer yet.
++	 * Resolve it before the IOBSD wait below; that wait needs a timer timeout.
++	 * Band 0 shows the rootdev result: white entered, green returned a device,
++	 * red failed.  A failure panics so the panic screen prints the error code.
 +	 */
 +	{
-+		/* Paint before the call: if this appears and the heartbeat
-+		 * stops, kebab_ufs_rootdev itself is the blocker. */
-+		{
-+			extern uint64_t kebab_fb_va, kebab_fb_band;
-+			if (kebab_fb_va != 0 && kebab_fb_band != 0) {
-+				volatile uint32_t *p = (volatile uint32_t *)(kebab_fb_va + kebab_fb_band * 0);
-+				for (uint64_t i = 0; i < kebab_fb_band / 4; i++) {
-+					p[i] = 0xFFFF00FFu;
-+				}
-+			}
-+		}
-+		int ufs_error = kebab_ufs_rootdev(root);
++		extern uint64_t kebab_fb_va, kebab_fb_band;
++		int ufs_error;
 +
-+		/* One visible result band: green = rootdev returned 0, red = error. */
-+		{
-+			extern uint64_t kebab_fb_va, kebab_fb_band;
-+			if (kebab_fb_va != 0 && kebab_fb_band != 0) {
-+				volatile uint32_t *p = (volatile uint32_t *)(kebab_fb_va + kebab_fb_band * 5);
-+				uint32_t color = ufs_error ? 0xFFFF0000u : 0xFF00FF00u;
-+				for (uint64_t i = 0; i < kebab_fb_band / 4; i++) {
-+					p[i] = color;
-+				}
++		if (kebab_fb_va != 0 && kebab_fb_band != 0) {
++			volatile uint32_t *p =
++			    (volatile uint32_t *)(kebab_fb_va + kebab_fb_band * 0);
++			for (uint64_t i = 0; i < kebab_fb_band / 4; i++) {
++				p[i] = 0xFFFF00FFu;
 +			}
++			__asm__ volatile ("dsb sy" ::: "memory");
 +		}
-+		else {
++		ufs_error = kebab_ufs_rootdev(root);
++		if (kebab_fb_va != 0 && kebab_fb_band != 0) {
++			volatile uint32_t *p =
++			    (volatile uint32_t *)(kebab_fb_va + kebab_fb_band * 0);
++			uint32_t color = ufs_error ? 0xFFFF0000u : 0xFF00FF00u;
++			for (uint64_t i = 0; i < kebab_fb_band / 4; i++) {
++				p[i] = color;
++			}
++			__asm__ volatile ("dsb sy" ::: "memory");
++		}
++		if (ufs_error != 0) {
 +			panic("KEBAB UFS root: %d", ufs_error);
 +		}
-+		if (ufs_error == 0) {
-+			strlcpy(rootName, "ufsroot0", rootNameSize);
-+			IOLog("BSD root: %s, major %d, minor %d\n", rootName,
-+			    major(*root), minor(*root));
-+			*oflags = 0;
-+			return kIOReturnSuccess;
-+		}
++		strlcpy(rootName, "ufsroot0", rootNameSize);
++		IOLog("BSD root: %s, major %d, minor %d\n", rootName,
++		    major(*root), minor(*root));
++		*oflags = 0;
++		return kIOReturnSuccess;
 +	}
 +#endif
++
 +
  	// stall here for anyone matching on the IOBSD resource to finish (filesystems)
  	matching = IOService::serviceMatching(gIOResourcesKey);
