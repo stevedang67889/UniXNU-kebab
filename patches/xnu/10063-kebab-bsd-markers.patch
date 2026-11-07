@@ -1,11 +1,13 @@
 diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
-index bb558ee..01e1ca9 100644
+index bb558ee..f9c65f0 100644
 --- a/bsd/kern/bsd_init.c
 +++ b/bsd/kern/bsd_init.c
-@@ -203,6 +203,33 @@
+@@ -203,6 +203,35 @@
  #include <tests/xnupost.h>
  #endif
  
++extern boolean_t ml_set_interrupts_enabled(boolean_t enable);
++
 +/* Filled by the GIC stub once it maps the GOP framebuffer; the BSD markers
 + * paint directly through these values, so they never call ml_io_map. */
 +uint64_t kebab_fb_va = 0;
@@ -36,7 +38,7 @@ index bb558ee..01e1ca9 100644
  void * get_user_regs(thread_t);         /* XXX kludge for <machine/thread.h> */
  void IOKitInitializeTime(void);         /* XXX */
  void IOSleep(unsigned int);             /* XXX */
-@@ -487,6 +514,10 @@ bsd_init(void)
+@@ -487,6 +516,10 @@ bsd_init(void)
  		.p_csflags = CS_VALID,
  	};
  	struct task_ro_data kerntask_ro_data = { };
@@ -47,7 +49,7 @@ index bb558ee..01e1ca9 100644
  #if CONFIG_NETBOOT || CONFIG_IMAGEBOOT
  	boolean_t       netboot = FALSE;
  #endif
-@@ -504,17 +535,21 @@ bsd_init(void)
+@@ -504,17 +537,21 @@ bsd_init(void)
  #endif
  
  	throttle_init();
@@ -70,7 +72,7 @@ index bb558ee..01e1ca9 100644
  
  	/* kernel_task->proc = kernproc; */
  	set_bsdtask_info(kernel_task, (void *)kernproc);
-@@ -539,6 +574,7 @@ bsd_init(void)
+@@ -539,6 +576,7 @@ bsd_init(void)
  	kauth_cred_set(&kernproc_ro_data.p_ucred.__smr_ptr, vfs_context0.vc_ucred);
  	kernproc->p_proc_ro = proc_ro_alloc(kernproc, &kernproc_ro_data,
  	    kernel_task, &kerntask_ro_data);
@@ -78,7 +80,7 @@ index bb558ee..01e1ca9 100644
  
  	/* give kernproc a name */
  	bsd_init_kprintf("calling process_name\n");
-@@ -883,6 +919,7 @@ bsd_init(void)
+@@ -883,6 +921,7 @@ bsd_init(void)
  
  		bsd_init_kprintf("calling setconf\n");
  		setconf();
