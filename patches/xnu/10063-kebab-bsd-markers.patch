@@ -1,0 +1,86 @@
+diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
+index bb558ee..1737eab 100644
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -203,6 +203,33 @@
+ #include <tests/xnupost.h>
+ #endif
+ 
++/* Filled by the GIC stub once it maps the GOP framebuffer; the BSD markers
++ * paint directly through these values, so they never call ml_io_map. */
++uint64_t kebab_fb_va = 0;
++uint64_t kebab_fb_band = 0;
++
++static void
++kebab_bsd_mark(int band)
++{
++	uint64_t bytes;
++	/* Index = band - 10; avoid the GIC white/blue/magenta palette. */
++	static const uint32_t colors[8] = {
++		0xFFFFFFFFu, 0xFF00FF00u, 0xFFFFFF00u, 0xFF00FFFFu,
++		0xFFFF0000u, 0xFFFF8000u, 0xFF800000u, 0xFF808080u
++	};
++	volatile uint32_t *p;
++
++	if (band < 10 || band >= 18 || kebab_fb_va == 0 || kebab_fb_band == 0) {
++		return;
++	}
++	bytes = kebab_fb_band;
++	p = (volatile uint32_t *)(kebab_fb_va + bytes * (uint64_t)(band - 10));
++	for (uint64_t i = 0; i < bytes / 4; i++) {
++		p[i] = colors[band - 10];
++	}
++	__asm__ volatile ("dsb sy" ::: "memory");
++}
++
+ void * get_user_regs(thread_t);         /* XXX kludge for <machine/thread.h> */
+ void IOKitInitializeTime(void);         /* XXX */
+ void IOSleep(unsigned int);             /* XXX */
+@@ -487,6 +514,8 @@ bsd_init(void)
+ 		.p_csflags = CS_VALID,
+ 	};
+ 	struct task_ro_data kerntask_ro_data = { };
++
++	kebab_bsd_mark(10);
+ #if CONFIG_NETBOOT || CONFIG_IMAGEBOOT
+ 	boolean_t       netboot = FALSE;
+ #endif
+@@ -504,17 +533,21 @@ bsd_init(void)
+ #endif
+ 
+ 	throttle_init();
++	kebab_bsd_mark(14);
+ 
+-	printf(copyright);
++	/* Bring-up: no serial or video console exists at bsd_init; skip the
++	 * blocking copyright printf. */
+ 
+ #if CONFIG_DEV_KMEM
+ 	bsd_init_kprintf("calling dev_kmem_init\n");
+ 	dev_kmem_init();
+ #endif
+ 
++	kebab_bsd_mark(15);
+ 	/* Initialize kauth subsystem before instancing the first credential */
+ 	bsd_init_kprintf("calling kauth_init\n");
+ 	kauth_init();
++	kebab_bsd_mark(11);
+ 
+ 	/* kernel_task->proc = kernproc; */
+ 	set_bsdtask_info(kernel_task, (void *)kernproc);
+@@ -539,6 +572,7 @@ bsd_init(void)
+ 	kauth_cred_set(&kernproc_ro_data.p_ucred.__smr_ptr, vfs_context0.vc_ucred);
+ 	kernproc->p_proc_ro = proc_ro_alloc(kernproc, &kernproc_ro_data,
+ 	    kernel_task, &kerntask_ro_data);
++	kebab_bsd_mark(12);
+ 
+ 	/* give kernproc a name */
+ 	bsd_init_kprintf("calling process_name\n");
+@@ -883,6 +917,7 @@ bsd_init(void)
+ 
+ 		bsd_init_kprintf("calling setconf\n");
+ 		setconf();
++		kebab_bsd_mark(13);
+ #if CONFIG_NETBOOT
+ 		netboot = (mountroot == netboot_mountroot);
+ #endif
