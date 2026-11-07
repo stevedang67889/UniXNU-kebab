@@ -991,3 +991,27 @@ valid device and whether `vfs_mountroot` proceeds. The root probes at bands
 The unconditional early-root experiment (`kebab_ufs_rootdev` called before the
 IOBSD wait) is in `10063-kebab-ufs-early-root.patch`; the boot arg conditional
 version is the safer final form once the call path is confirmed.
+
+
+## 2026-11-08: IRQs, markers and the observation wall
+
+- Enabling IRQs at the top of `bsd_init`, after the binary GIC/timer stub, made
+  the timer heartbeat run. The `kauth_init` allocation stall no longer appears
+  when the heartbeat is present.
+- The source framebuffer markers (GIC stage bands, BSD stage bands, UFS stage
+  bands) do not give a reliable stage readback. The same white band 0 is seen
+  for different kernels, and the GIC stub paints its own progress bands.
+- A full Mu-Silicium checkout was restored and its firmware built, but the new
+  boot image stops at the boot logo or a black screen; the old firmware plus a
+  repacked payload remains the only booting path.
+- A panic test (`panic("KEBAB BOOT TEST")`) at the top of
+  `kernel_bootstrap_thread` was added to test whether the panic screen renders;
+  the panic-screen payload patch is applied, but the screen has not produced
+  text so far.
+- The UFS driver now allocates its DMA pool with 16 KiB alignment and checks
+  16 KiB physical contiguity on the 4 KiB kernel, matching GFander's 16 KiB
+  driver assumption. The UFS stage colour still stays at the entry white.
+- UART was declined; without UART, panic screen or storage-backed logs, further
+  UFS init changes are blind.
+- Branches: `kebab-cfg` (source GIC), `kebab-cfg-bingic` (binary GIC, 4K policy,
+  16 KiB DMA), `no-early`, `no-srcgic`.

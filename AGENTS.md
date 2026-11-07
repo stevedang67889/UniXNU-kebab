@@ -52,12 +52,13 @@ dispatch in `sleh_irq`. The patch is
 The source-GIC hardware images (`srcgic5`, `srcgic6`) still show only colour
 bars and no text, so the console/panic transport is unresolved.
 
-The KEBAB machine config builds and, with the binary GIC stub, reaches
-`bsd_init`. Enabling IRQs at the top of `bsd_init` (after the GIC/timer stub is
-installed) clears the `kauth_init`/allocation stall: the source framebuffer
-markers now run through `setconf`, and the GIC timer heartbeat alternates
-red/green on the last band. The next check is the UFS root handoff and
-`vfs_mountroot`; source-GIC still stops before `pe_init_fiq` (900e).
+The KEBAB machine config and the binary GIC stub boot the early kernel; the
+timer heartbeat runs after enabling IRQs at `bsd_init`. The source
+framebuffer stage markers are not reliable enough to prove `bsd_init`,
+`IOFindBSDRoot` or `kebab_ufs_rootdev`, and the panic-screen path did not
+render text on the old firmware. The UFS driver now uses 16 KiB-aligned DMA
+on the 4 KiB kernel. UART was declined, so the next step needs another
+trustworthy observation channel before more UFS changes.
 `ufsprobe2` did **not** show the green band 15, so `IOFindBSDRoot` is not
 reached yet. Retting `loopattach`/`inittodr` made the boot worse and was
 reverted.
