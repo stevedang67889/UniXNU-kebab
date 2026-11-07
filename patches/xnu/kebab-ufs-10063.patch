@@ -12,7 +12,7 @@ index 19b4065..4f8203d 100644
  bsd/dev/unix_startup.c			standard
 diff --git a/bsd/dev/kebab_ufs.c b/bsd/dev/kebab_ufs.c
 new file mode 100644
-index 0000000..bec0045
+index 0000000..33d1176
 --- /dev/null
 +++ b/bsd/dev/kebab_ufs.c
 @@ -0,0 +1,910 @@
@@ -765,7 +765,7 @@ index 0000000..bec0045
 +		return ENXIO;
 +	}
 +	ppnum_t max_pnum = (cap & CAP_64AS) ? 0 : (ppnum_t)atop_64(UINT32_MAX);
-+	if (kmem_alloc_contig(kernel_map, &su.dma, DMA_SIZE, PAGE_MASK, max_pnum, 0,
++	if (kmem_alloc_contig(kernel_map, &su.dma, DMA_SIZE, 0x3fff, max_pnum, 0,
 +	    KMA_DATA | KMA_ZERO | KMA_PERMANENT, VM_KERN_MEMORY_IOKIT) != KERN_SUCCESS) {
 +		printf("KEBAB UFS: no contiguous DMA memory\n");
 +		return ENOMEM;
@@ -775,12 +775,12 @@ index 0000000..bec0045
 +		return ENOMEM;
 +	}
 +	su.dma_pa = ptoa_64(pn);
-+	if ((su.dma & PAGE_MASK) || (su.dma_pa & PAGE_MASK) ||
++	if ((su.dma & 0x3fff) || (su.dma_pa & 0x3fff) ||
 +	    (!(cap & CAP_64AS) && su.dma_pa + DMA_SIZE - 1 > UINT32_MAX)) {
 +		return EINVAL;
 +	}
 +	/* kmem_alloc_contig wires contiguous pages; verify before publishing DMA. */
-+	for (vm_size_t off = 0; off < DMA_SIZE; off += PAGE_SIZE) {
++	for (vm_size_t off = 0; off < DMA_SIZE; off += 0x4000) {
 +		ppnum_t page = pmap_find_phys(kernel_pmap, (addr64_t)(su.dma + off));
 +		if (!page || ptoa_64(page) != su.dma_pa + off) {
 +			printf("KEBAB UFS: noncontiguous DMA allocation\n");
