@@ -18,7 +18,7 @@ index 92142f7..332fad3 100644
 +		{
 +			extern uint64_t kebab_fb_va, kebab_fb_band;
 +			if (kebab_fb_va != 0 && kebab_fb_band != 0) {
-+				volatile uint32_t *p = (volatile uint32_t *)(kebab_fb_va + kebab_fb_band * 4);
++				volatile uint32_t *p = (volatile uint32_t *)(kebab_fb_va + kebab_fb_band * 0);
 +				for (uint64_t i = 0; i < kebab_fb_band / 4; i++) {
 +					p[i] = 0xFFFF00FFu;
 +				}

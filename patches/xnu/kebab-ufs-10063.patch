@@ -12,10 +12,10 @@ index 19b4065..4f8203d 100644
  bsd/dev/unix_startup.c			standard
 diff --git a/bsd/dev/kebab_ufs.c b/bsd/dev/kebab_ufs.c
 new file mode 100644
-index 0000000..1d66736
+index 0000000..a70d415
 --- /dev/null
 +++ b/bsd/dev/kebab_ufs.c
-@@ -0,0 +1,852 @@
+@@ -0,0 +1,872 @@
 +/*
 + * KEBAB internal UFS root device (read-only).
 + *
@@ -852,9 +852,29 @@ index 0000000..1d66736
 +/* Root device for rd=ufsroot0 (IOFindBSDRoot). */
 +int kebab_ufs_rootdev(dev_t *dev);
 +
++/* Framebuffer marker exported by the GIC stub through bsd_init.c. */
++extern uint64_t kebab_fb_va;
++extern uint64_t kebab_fb_band;
++
++static void
++kebab_ufs_mark(int band, uint32_t color)
++{
++	volatile uint32_t *p;
++
++	if (kebab_fb_va == 0 || kebab_fb_band == 0) {
++		return;
++	}
++	p = (volatile uint32_t *)(kebab_fb_va + kebab_fb_band * (uint64_t)band);
++	for (uint64_t i = 0; i < kebab_fb_band / 4; i++) {
++		p[i] = color;
++	}
++	__asm__ volatile ("dsb sy" ::: "memory");
++}
++
 +int
 +kebab_ufs_rootdev(dev_t *dev)
 +{
++	kebab_ufs_mark(1, 0xFFFFFFFFu);
 +	lck_mtx_lock(&kebab_ufs_lock);
 +	if (!su.init_attempted) {
 +		su.init_attempted = true;
