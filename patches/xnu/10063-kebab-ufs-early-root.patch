@@ -2,7 +2,7 @@ diff --git a/iokit/bsddev/IOKitBSDInit.cpp b/iokit/bsddev/IOKitBSDInit.cpp
 index 92142f7..332fad3 100644
 --- a/iokit/bsddev/IOKitBSDInit.cpp
 +++ b/iokit/bsddev/IOKitBSDInit.cpp
-@@ -691,6 +691,36 @@ IOFindBSDRoot( char * rootName, unsigned int rootNameSize,
+@@ -691,6 +691,46 @@ IOFindBSDRoot( char * rootName, unsigned int rootNameSize,
  
  	int xchar, dchar;
  
@@ -13,6 +13,17 @@ index 92142f7..332fad3 100644
 +	 * and the early bring-up kernel has no periodic timer yet.
 +	 */
 +	{
++		/* Paint before the call: if this appears and the heartbeat
++		 * stops, kebab_ufs_rootdev itself is the blocker. */
++		{
++			extern uint64_t kebab_fb_va, kebab_fb_band;
++			if (kebab_fb_va != 0 && kebab_fb_band != 0) {
++				volatile uint32_t *p = (volatile uint32_t *)(kebab_fb_va + kebab_fb_band * 4);
++				for (uint64_t i = 0; i < kebab_fb_band / 4; i++) {
++					p[i] = 0xFFFF00FFu;
++				}
++			}
++		}
 +		int ufs_error = kebab_ufs_rootdev(root);
 +
 +		/* One visible result band: green = rootdev returned 0, red = error. */
