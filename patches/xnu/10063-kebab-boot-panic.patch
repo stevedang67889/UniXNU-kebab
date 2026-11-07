@@ -1,0 +1,12 @@
+diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
+index 0a9f261..36d570c 100644
+--- a/osfmk/kern/startup.c
++++ b/osfmk/kern/startup.c
+@@ -599,6 +599,7 @@ SECURITY_READ_ONLY_LATE(uint64_t) vm_kernel_addrhash_salt_ext;
+ static void
+ kernel_bootstrap_thread(void)
+ {
++	panic("KEBAB BOOT TEST");
+ 	processor_t processor = current_processor();
+ 
+ #if (DEVELOPMENT || DEBUG)
