@@ -12,10 +12,10 @@ index 19b4065..4f8203d 100644
  bsd/dev/unix_startup.c			standard
 diff --git a/bsd/dev/kebab_ufs.c b/bsd/dev/kebab_ufs.c
 new file mode 100644
-index 0000000..eb27742
+index 0000000..bec0045
 --- /dev/null
 +++ b/bsd/dev/kebab_ufs.c
-@@ -0,0 +1,908 @@
+@@ -0,0 +1,910 @@
 +/*
 + * KEBAB internal UFS root device (read-only).
 + *
@@ -889,7 +889,10 @@ index 0000000..eb27742
 +kebab_ufs_rootdev(dev_t *dev)
 +{
 +	kebab_ufs_mark(0, 0xFFFFFFFFu);
-+	lck_mtx_lock(&kebab_ufs_lock);
++	/* Bring-up: rootdev runs once from bsd_init, before any other UFS user.
++	 * The mutex is skipped here: taking it before the timer/interrupt state
++	 * is settled parks the boot in the lock slow path.  The bdev entry
++	 * points still take it for normal I/O. */
 +	if (!su.init_attempted) {
 +		su.init_attempted = true;
 +		su.init_error = kebab_ufs_init();
@@ -920,7 +923,6 @@ index 0000000..eb27742
 +	if (!error) {
 +		*dev = su.bdev;
 +	}
-+	lck_mtx_unlock(&kebab_ufs_lock);
 +	return error;
 +}
 +#endif /* __arm64__ */
