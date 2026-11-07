@@ -12,10 +12,10 @@ index 19b4065..4f8203d 100644
  bsd/dev/unix_startup.c			standard
 diff --git a/bsd/dev/kebab_ufs.c b/bsd/dev/kebab_ufs.c
 new file mode 100644
-index 0000000..abd86c4
+index 0000000..1c0e93a
 --- /dev/null
 +++ b/bsd/dev/kebab_ufs.c
-@@ -0,0 +1,885 @@
+@@ -0,0 +1,886 @@
 +/*
 + * KEBAB internal UFS root device (read-only).
 + *
@@ -725,6 +725,7 @@ index 0000000..abd86c4
 +static int
 +kebab_ufs_init(void)
 +{
++	kebab_ufs_mark(0, 0xFFFF8000u);
 +	DTEntry node;
 +	const void *prop = NULL;
 +	uint64_t reg[2];
