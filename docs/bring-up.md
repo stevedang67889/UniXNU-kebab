@@ -947,3 +947,24 @@ next successful kernel.
   is placed just before `kauth_init` and is pending a hardware test.
 - Branches: `kebab-cfg` (source GIC + markers), `kebab-cfg-bingic`
   (binary GIC + 4K runtime policy + markers), `no-early`, `no-srcgic`.
+
+
+## 2026-11-07: docs study - the stop is the documented GIC/timer cycle
+
+The upstream kebab device record (`docs/devices/kebab-stevedang67889.md`) and
+the current `docs/` tree document the same stop we are measuring:
+
+- `bsd_init` reaches `throttle_init`; `thread_call_allocate` blocks in
+  `kalloc_type_impl_internal`/`zalloc_ext`.
+- The first `printf` blocks because no console exists; skipping it moves the
+  stop to `kauth_init`, which also blocks in an allocation.
+- With no interrupt controller and no timer, every wait that wants to sleep
+  never returns; with IRQs unmasked the first IRQ stops the boot.
+- The documented next route is a real GICv3 plus arch-timer driver (the generic
+  `gic_v3_irq.c` path reading `/arm-io/gic`, or `ArmCpu::prepareGic` before
+  IOKit matching), then unmask IRQs and confirm the timer heartbeat.
+
+So the marker work has identified the stage, but the fix is the interrupt
+controller/timer, not another marker. The 4 KiB page-table reference also
+confirms that the KEBAB machine config must keep the 4 KiB runtime policy
+(`native-4k-user-abi`) and the bootstrap-table budget.
