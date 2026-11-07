@@ -12,10 +12,10 @@ index 19b4065..4f8203d 100644
  bsd/dev/unix_startup.c			standard
 diff --git a/bsd/dev/kebab_ufs.c b/bsd/dev/kebab_ufs.c
 new file mode 100644
-index 0000000..26ee41a
+index 0000000..2c644ce
 --- /dev/null
 +++ b/bsd/dev/kebab_ufs.c
-@@ -0,0 +1,874 @@
+@@ -0,0 +1,883 @@
 +/*
 + * KEBAB internal UFS root device (read-only).
 + *
@@ -752,6 +752,7 @@ index 0000000..26ee41a
 +	if (!su.regs) {
 +		return ENOMEM;
 +	}
++	kebab_ufs_mark(0, 0xFFFF0000u);
 +	uint32_t ver = ufs_rd(REG_VER), cap = ufs_rd(REG_CAP);
 +	printf("KEBAB UFS: VER 0x%x CAP 0x%x HCE 0x%x HCS 0x%x\n",
 +	    ver, cap, ufs_rd(REG_HCE), ufs_rd(REG_HCS));
@@ -809,10 +810,19 @@ index 0000000..26ee41a
 +		}
 +	}
 +	if (!error) {
++		kebab_ufs_mark(0, 0xFFFFFF00u);
++	}
++	if (!error) {
 +		error = ufs_read_capacity();
 +	}
 +	if (!error) {
++		kebab_ufs_mark(0, 0xFF00FF00u);
++	}
++	if (!error) {
 +		error = ufs_find_partition(want);
++	}
++	if (!error) {
++		kebab_ufs_mark(0, 0xFF00FFFFu);
 +	}
 +	if (error) {
 +		return error;
@@ -843,6 +853,7 @@ index 0000000..26ee41a
 +		return ENOMEM;
 +	}
 +	su.ready = true;
++	kebab_ufs_mark(0, 0xFF0000FFu);
 +	printf("KEBAB UFS: \"%s\" on LUN %u: first block 0x%llx, %llu MiB, %s\n",
 +	    want, su.lun, su.first_block, su.nblocks * UFS_BLOCK >> 20,
 +	    su.writable ? "read-write" : "read-only");
@@ -874,13 +885,11 @@ index 0000000..26ee41a
 +int
 +kebab_ufs_rootdev(dev_t *dev)
 +{
-+	kebab_ufs_mark(1, 0xFFFFFFFFu);
++	kebab_ufs_mark(0, 0xFFFFFFFFu);
 +	lck_mtx_lock(&kebab_ufs_lock);
 +	if (!su.init_attempted) {
 +		su.init_attempted = true;
-+		kebab_ufs_mark(6, 0xFFFF0000u);
 +		su.init_error = kebab_ufs_init();
-+		kebab_ufs_mark(7, 0xFF00FF00u);
 +	}
 +	int error = su.init_error;
 +	if (!error) {
