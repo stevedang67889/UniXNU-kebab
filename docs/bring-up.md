@@ -968,3 +968,26 @@ So the marker work has identified the stage, but the fix is the interrupt
 controller/timer, not another marker. The 4 KiB page-table reference also
 confirms that the KEBAB machine config must keep the 4 KiB runtime policy
 (`native-4k-user-abi`) and the bootstrap-table budget.
+
+
+## 2026-11-07: IRQs at bsd_init, kauth cleared, setconf reached
+
+The binary GIC stub configures the timer PPI but the bring-up image kept IRQs
+masked, so the first allocations in `bsd_init` blocked in
+`kalloc_type_impl_internal`/`zalloc_ext` and `kauth_init` never returned.
+
+The kernel is now built with `ml_set_interrupts_enabled(TRUE)` at the top of
+`bsd_init`, after the GIC stub has run:
+
+- the `kauth_init`, `proc_ro_alloc` and `setconf` markers all paint
+- the GIC timer heartbeat on the last band alternates red/green, so timer
+  interrupts are delivered
+- the BSD markers 14-19 are visible on the panel
+
+The next question is the root handoff: whether `kebab_ufs_rootdev` returns a
+valid device and whether `vfs_mountroot` proceeds. The root probes at bands
+6/7 were not clearly visible against the marker layout.
+
+The unconditional early-root experiment (`kebab_ufs_rootdev` called before the
+IOBSD wait) is in `10063-kebab-ufs-early-root.patch`; the boot arg conditional
+version is the safer final form once the call path is confirmed.

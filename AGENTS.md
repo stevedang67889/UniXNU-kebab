@@ -53,12 +53,11 @@ The source-GIC hardware images (`srcgic5`, `srcgic6`) still show only colour
 bars and no text, so the console/panic transport is unresolved.
 
 The KEBAB machine config builds and, with the binary GIC stub, reaches
-`bsd_init` (band 14). Source framebuffer markers (`10063-kebab-bsd-markers.patch`)
-paint through the framebuffer VA that the GIC stub exports into
-`_kebab_fb_va`/`_kebab_fb_band`; they show the `bsd_init` start and the point
-after `throttle_init`, and the boot stops before `kauth_init`. Probe stubs
-inside `bsd_init` still stop the boot early and are not usable. The source-GIC
-path stops before `pe_init_fiq` on the KEBAB config (900e).
+`bsd_init`. Enabling IRQs at the top of `bsd_init` (after the GIC/timer stub is
+installed) clears the `kauth_init`/allocation stall: the source framebuffer
+markers now run through `setconf`, and the GIC timer heartbeat alternates
+red/green on the last band. The next check is the UFS root handoff and
+`vfs_mountroot`; source-GIC still stops before `pe_init_fiq` (900e).
 `ufsprobe2` did **not** show the green band 15, so `IOFindBSDRoot` is not
 reached yet. Retting `loopattach`/`inittodr` made the boot worse and was
 reverted.
