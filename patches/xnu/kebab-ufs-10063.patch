@@ -12,10 +12,10 @@ index 19b4065..4f8203d 100644
  bsd/dev/unix_startup.c			standard
 diff --git a/bsd/dev/kebab_ufs.c b/bsd/dev/kebab_ufs.c
 new file mode 100644
-index 0000000..2c644ce
+index 0000000..abd86c4
 --- /dev/null
 +++ b/bsd/dev/kebab_ufs.c
-@@ -0,0 +1,883 @@
+@@ -0,0 +1,885 @@
 +/*
 + * KEBAB internal UFS root device (read-only).
 + *
@@ -136,6 +136,8 @@ index 0000000..2c644ce
 +	bool init_attempted;
 +	int init_error;
 +} su;
++
++static void kebab_ufs_mark(int band, uint32_t color);
 +
 +static LCK_GRP_DECLARE(kebab_ufs_grp, "kebab_ufs");
 +static LCK_MTX_DECLARE(kebab_ufs_lock, &kebab_ufs_grp);
