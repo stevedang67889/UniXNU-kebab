@@ -1,5 +1,5 @@
 diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
-index bb558ee..1737eab 100644
+index bb558ee..f490663 100644
 --- a/bsd/kern/bsd_init.c
 +++ b/bsd/kern/bsd_init.c
 @@ -203,6 +203,33 @@
@@ -15,20 +15,20 @@ index bb558ee..1737eab 100644
 +kebab_bsd_mark(int band)
 +{
 +	uint64_t bytes;
-+	/* Index = band - 10; avoid the GIC white/blue/magenta palette. */
++	/* Index = band - 14; avoid the GIC white/yellow/green/blue/magenta palette. */
 +	static const uint32_t colors[8] = {
-+		0xFFFFFFFFu, 0xFF00FF00u, 0xFFFFFF00u, 0xFF00FFFFu,
-+		0xFFFF0000u, 0xFFFF8000u, 0xFF800000u, 0xFF808080u
++		0xFFFFFFFFu, 0xFFFF0000u, 0xFF00FF00u, 0xFFFFFF00u,
++		0xFF0000FFu, 0xFF00FFFFu, 0xFFFF8000u, 0xFF808080u
 +	};
 +	volatile uint32_t *p;
 +
-+	if (band < 10 || band >= 18 || kebab_fb_va == 0 || kebab_fb_band == 0) {
++	if (band < 14 || band >= 22 || kebab_fb_va == 0 || kebab_fb_band == 0) {
 +		return;
 +	}
 +	bytes = kebab_fb_band;
-+	p = (volatile uint32_t *)(kebab_fb_va + bytes * (uint64_t)(band - 10));
++	p = (volatile uint32_t *)(kebab_fb_va + bytes * (uint64_t)(band - 14));
 +	for (uint64_t i = 0; i < bytes / 4; i++) {
-+		p[i] = colors[band - 10];
++		p[i] = colors[band - 14];
 +	}
 +	__asm__ volatile ("dsb sy" ::: "memory");
 +}
@@ -41,7 +41,7 @@ index bb558ee..1737eab 100644
  	};
  	struct task_ro_data kerntask_ro_data = { };
 +
-+	kebab_bsd_mark(10);
++	kebab_bsd_mark(16);
  #if CONFIG_NETBOOT || CONFIG_IMAGEBOOT
  	boolean_t       netboot = FALSE;
  #endif
@@ -64,7 +64,7 @@ index bb558ee..1737eab 100644
  	/* Initialize kauth subsystem before instancing the first credential */
  	bsd_init_kprintf("calling kauth_init\n");
  	kauth_init();
-+	kebab_bsd_mark(11);
++	kebab_bsd_mark(17);
  
  	/* kernel_task->proc = kernproc; */
  	set_bsdtask_info(kernel_task, (void *)kernproc);
@@ -72,7 +72,7 @@ index bb558ee..1737eab 100644
  	kauth_cred_set(&kernproc_ro_data.p_ucred.__smr_ptr, vfs_context0.vc_ucred);
  	kernproc->p_proc_ro = proc_ro_alloc(kernproc, &kernproc_ro_data,
  	    kernel_task, &kerntask_ro_data);
-+	kebab_bsd_mark(12);
++	kebab_bsd_mark(18);
  
  	/* give kernproc a name */
  	bsd_init_kprintf("calling process_name\n");
@@ -80,7 +80,7 @@ index bb558ee..1737eab 100644
  
  		bsd_init_kprintf("calling setconf\n");
  		setconf();
-+		kebab_bsd_mark(13);
++		kebab_bsd_mark(19);
  #if CONFIG_NETBOOT
  		netboot = (mountroot == netboot_mountroot);
  #endif
