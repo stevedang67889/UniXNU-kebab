@@ -926,3 +926,35 @@ next successful kernel.
   variant with the source-GIC patch removed). Main keeps the source-GIC and
   early-root patches.
 >>>>>>> Stashed changes
+
+
+## 2026-11-08: early boot bisection
+
+The framebuffer bands at the top of the screen are painted by DarwinBoot, not
+by the kernel. A kernel-entry marker was added in `start_first_cpu` (MMU off,
+physical `boot_args`, paint magenta at the top of the frame buffer) to prove
+that the kernel entry really runs. With that marker and the entry-probe stage
+bars, the cold-boot path was bisected with PSCI `SYSTEM_RESET` at successive
+points:
+
+- kernel entry, stage 1 and stage 2 (before the MMU is enabled): reached
+- MMU enabled: reached (stage 3 reset fired)
+- `arm_init` entry: reached
+- `PE_init_platform` returned: reached
+- `SecureDTInit` returned: reached
+- `pe_identify_machine` returned: reached
+- just before `pe_init_debug`: reached
+- `PE_init_cpu` returned: not reached
+
+`PE_init_cpu` is `pe_init_fiq()` in this tree (`pexpert/arm/hwtrace/hwtrace.c`).
+Skipping `pe_init_fiq()` for KEBAB and adding a hard-coded GIC fallback for a
+missing `/arm-io/gic` node did not change the visible result; the device still
+ends in the Qualcomm 900E crash-dump port rather than a panic screen.
+
+The earlier claims that the framebuffer `bsd_init` markers proved `bsd_init`
+or `IOFindBSDRoot` are withdrawn: those bands are DarwinBoot colours. The
+source markers and the panic screen are not reliable on this path yet.
+
+Next: get a trustworthy signal out of `PE_init_cpu` / `pe_init_fiq` (reset
+reliability is itself doubtful after early boot) or a crash PC from the 900E
+crash dump. UFS and `IOFindBSDRoot` are still downstream of this blocker.
