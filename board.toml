@@ -129,7 +129,7 @@ size_mib = 64
 loader = "firmware"
 title = "kebab first boot: source 4K XNU to console"
 dram_size = "0xC0000000"   # one 3 GiB DRAM window at 0xC0000000
-panic_screen = true
+panic_screen = false
 # No entry probe: this is the baseline boot image.
 kernel_args = [
   "-v",
