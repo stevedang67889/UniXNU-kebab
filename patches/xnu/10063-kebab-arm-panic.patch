@@ -10,3 +10,15 @@ index 8fe43b6..ba26c9d 100644
  	unsigned int    maxmem;
  	uint32_t        memsize;
  	uint64_t        xmaxmem;
+diff --git a/pexpert/arm/pe_init.c b/pexpert/arm/pe_init.c
+index 433b6cd..65cb52a 100644
+--- a/pexpert/arm/pe_init.c
++++ b/pexpert/arm/pe_init.c
+@@ -439,6 +439,7 @@ PE_init_platform(boolean_t vm_initialized, void *args)
+ 		pe_identify_machine(boot_args_ptr);
+ 	} else {
+ 		pe_arm_init_interrupts(args);
++		panic("KEBAB AFTER GIC");
+ 		pe_arm_init_debug(args);
+ 	}
+ 
