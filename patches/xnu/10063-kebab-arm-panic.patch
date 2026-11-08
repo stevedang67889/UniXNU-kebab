@@ -11,12 +11,14 @@ index 8fe43b6..ba26c9d 100644
  	uint32_t        memsize;
  	uint64_t        xmaxmem;
 diff --git a/pexpert/arm/pe_init.c b/pexpert/arm/pe_init.c
-index 433b6cd..65cb52a 100644
+index 433b6cd..46f847f 100644
 --- a/pexpert/arm/pe_init.c
 +++ b/pexpert/arm/pe_init.c
-@@ -439,6 +439,7 @@ PE_init_platform(boolean_t vm_initialized, void *args)
+@@ -438,7 +438,9 @@ PE_init_platform(boolean_t vm_initialized, void *args)
+ 		SecureDTInit(PE_state.deviceTreeHead, PE_state.deviceTreeSize);
  		pe_identify_machine(boot_args_ptr);
  	} else {
++		panic("KEBAB BEFORE GIC");
  		pe_arm_init_interrupts(args);
 +		panic("KEBAB AFTER GIC");
  		pe_arm_init_debug(args);
