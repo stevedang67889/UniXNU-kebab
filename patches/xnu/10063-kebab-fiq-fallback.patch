@@ -1,0 +1,32 @@
+diff --git a/pexpert/arm/pe_fiq.c b/pexpert/arm/pe_fiq.c
+index 3ad743f..6453cd6 100644
+--- a/pexpert/arm/pe_fiq.c
++++ b/pexpert/arm/pe_fiq.c
+@@ -79,6 +79,18 @@ pe_init_fiq()
+ 	if (!gicd_base) {
+ 		// Find GIC DT node
+ 		error = SecureDTLookupEntry(NULL, "/arm-io/gic", &entry);
++#ifdef KEBAB
++		if (error != kSuccess) {
++			/* The live kebab DT has no Apple arm-io/gic node. */
++			gicd_base = ml_io_map(0x17A00000, 0x10000);
++			gicr_base = ml_io_map(0x17A60000, 0x100000);
++			gicr_size = 0x100000;
++			if (gicd_base == 0 || gicr_base == 0) {
++				panic("%s: cannot map kebab GIC", __func__);
++			}
++			goto gic_ready;
++		}
++#endif
+ 		if (error != kSuccess) {
+ 			panic("%s: cannot find GIC node in DT", __func__);
+ 		}
+@@ -120,6 +132,8 @@ pe_init_fiq()
+ 		gicr_size = gicr_size_prop;
+ 	}
+ 
++gic_ready:;
++
+ 	// Find the redistributor for this processor
+ 	vm_offset_t gicr_pe_base = find_gicr_pe_base();
+ 
