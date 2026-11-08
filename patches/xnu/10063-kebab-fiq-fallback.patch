@@ -1,5 +1,5 @@
 diff --git a/pexpert/arm/pe_fiq.c b/pexpert/arm/pe_fiq.c
-index 3ad743f..6453cd6 100644
+index 3ad743f..e7c7d4d 100644
 --- a/pexpert/arm/pe_fiq.c
 +++ b/pexpert/arm/pe_fiq.c
 @@ -79,6 +79,18 @@ pe_init_fiq()
@@ -21,7 +21,7 @@ index 3ad743f..6453cd6 100644
  		if (error != kSuccess) {
  			panic("%s: cannot find GIC node in DT", __func__);
  		}
-@@ -120,6 +132,8 @@ pe_init_fiq()
+@@ -120,8 +132,16 @@ pe_init_fiq()
  		gicr_size = gicr_size_prop;
  	}
  
@@ -29,4 +29,12 @@ index 3ad743f..6453cd6 100644
 +
  	// Find the redistributor for this processor
  	vm_offset_t gicr_pe_base = find_gicr_pe_base();
++	/* KEBAB: signal that the GICR redistributor was found. */
++	{
++		register unsigned long x0 __asm__("x0") = 0x84000009UL;
++		register unsigned long x1 __asm__("x1") = 0;
++		__asm__ volatile ("smc #0" : "+r"(x0) : "r"(x1) : "memory");
++	}
  
+ 	// Mark this PE to be awake
+ 	uint32_t gicr_waker = gicr_read32(GICR_WAKER);
