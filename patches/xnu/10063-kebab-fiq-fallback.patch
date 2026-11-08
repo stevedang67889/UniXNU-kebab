@@ -1,17 +1,14 @@
 diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
-index 8fe43b6..d27ace5 100644
+index 8fe43b6..0033e58 100644
 --- a/osfmk/arm/arm_init.c
 +++ b/osfmk/arm/arm_init.c
-@@ -611,6 +611,12 @@ arm_init(
+@@ -610,7 +610,8 @@ arm_init(
+ 	kptimer_curcpu_up();
  #endif /* KPERF */
  
- 	PE_init_cpu();
-+	/* KEBAB: signal that PE_init_cpu returned with pe_init_fiq skipped. */
-+	{
-+		register unsigned long x0 __asm__("x0") = 0x84000009UL;
-+		register unsigned long x1 __asm__("x1") = 0;
-+		__asm__ volatile ("smc #0" : "+r"(x0) : "r"(x1) : "memory");
-+	}
+-	PE_init_cpu();
++	/* KEBAB: PE_init_cpu (pe_init_fiq) is skipped entirely for now. */
++	/* PE_init_cpu(); */
  	fiq_context_init(TRUE);
  
  
