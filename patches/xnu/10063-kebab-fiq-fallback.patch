@@ -1,8 +1,8 @@
 diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
-index 8fe43b6..0033e58 100644
+index 8fe43b6..87b2d47 100644
 --- a/osfmk/arm/arm_init.c
 +++ b/osfmk/arm/arm_init.c
-@@ -610,7 +610,8 @@ arm_init(
+@@ -610,8 +610,15 @@ arm_init(
  	kptimer_curcpu_up();
  #endif /* KPERF */
  
@@ -10,8 +10,15 @@ index 8fe43b6..0033e58 100644
 +	/* KEBAB: PE_init_cpu (pe_init_fiq) is skipped entirely for now. */
 +	/* PE_init_cpu(); */
  	fiq_context_init(TRUE);
++	/* KEBAB: signal that fiq_context_init returned. */
++	{
++		register unsigned long x0 __asm__("x0") = 0x84000009UL;
++		register unsigned long x1 __asm__("x1") = 0;
++		__asm__ volatile ("smc #0" : "+r"(x0) : "r"(x1) : "memory");
++	}
  
  
+ #if HIBERNATION
 diff --git a/pexpert/arm/hwtrace/hwtrace.c b/pexpert/arm/hwtrace/hwtrace.c
 index 3ba6b91..1bcdfd0 100644
 --- a/pexpert/arm/hwtrace/hwtrace.c
