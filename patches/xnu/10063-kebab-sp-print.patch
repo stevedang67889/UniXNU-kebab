@@ -1,0 +1,27 @@
+diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
+index d4909c7..caf0607 100644
+--- a/osfmk/arm64/start.s
++++ b/osfmk/arm64/start.s
+@@ -507,6 +507,22 @@ LEXT(start_first_cpu)
+ 	msr		SPSel, #0							// Set SP_EL0 to interrupt stack
+ 	mov		sp, x0
+ 
++	/* KEBAB QEMU: print the SP that arm_init will receive (MMU still off). */
++	mov	x9, sp
++	mov	x10, #0x09000000
++	mov	x11, #16
++9:	lsr	x12, x9, #60
++	cmp	x12, #10
++	add	x12, x12, #48
++	b.lo	8f
++	add	x12, x12, #39
++8:	str	w12, [x10]
++	lsl	x9, x9, #4
++	subs	x11, x11, #1
++	b.ne	9b
++	mov	w12, #10
++	str	w12, [x10]
++
+ 	// Load address to the C init routine into link register
+ 	adrp	lr, EXT(arm_init)@page
+ 	add		lr, lr, EXT(arm_init)@pageoff
