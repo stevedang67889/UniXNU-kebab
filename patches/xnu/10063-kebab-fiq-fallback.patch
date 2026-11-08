@@ -1,3 +1,17 @@
+diff --git a/pexpert/arm/hwtrace/hwtrace.c b/pexpert/arm/hwtrace/hwtrace.c
+index 3ba6b91..1bcdfd0 100644
+--- a/pexpert/arm/hwtrace/hwtrace.c
++++ b/pexpert/arm/hwtrace/hwtrace.c
+@@ -484,7 +484,9 @@ PE_init_cpu(void)
+ 	}
+ #endif  // DEVELOPMENT || DEBUG
+ 
++#ifndef KEBAB
+ 	pe_init_fiq();
++#endif
+ }
+ 
+ 
 diff --git a/pexpert/arm/pe_fiq.c b/pexpert/arm/pe_fiq.c
 index 3ad743f..e7c7d4d 100644
 --- a/pexpert/arm/pe_fiq.c
