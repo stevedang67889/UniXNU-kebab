@@ -16,19 +16,16 @@ index 8fe43b6..2c7dbfa 100644
  
  
 diff --git a/pexpert/arm/pe_init.c b/pexpert/arm/pe_init.c
-index 433b6cd..5eac752 100644
+index 433b6cd..028a26e 100644
 --- a/pexpert/arm/pe_init.c
 +++ b/pexpert/arm/pe_init.c
-@@ -512,6 +512,12 @@ PE_init_platform(boolean_t vm_initialized, void *args)
+@@ -512,7 +512,8 @@ PE_init_platform(boolean_t vm_initialized, void *args)
  				bcopy(prop, &gPlatformMemoryID, size);
  			}
  		}
-+		/* KEBAB: signal that the DT block finished and pe_init_debug is next. */
-+		{
-+			register unsigned long x0 __asm__("x0") = 0x84000009UL;
-+			register unsigned long x1 __asm__("x1") = 0;
-+			__asm__ volatile ("smc #0" : "+r"(x0) : "r"(x1) : "memory");
-+		}
- 		pe_init_debug();
+-		pe_init_debug();
++		/* KEBAB: pe_init_debug() hangs before the first console exists. */
++		/* pe_init_debug(); */
  	}
  }
+ 
