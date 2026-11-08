@@ -1,0 +1,24 @@
+diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
+index d4909c7..9261bfc 100644
+--- a/osfmk/arm64/start.s
++++ b/osfmk/arm64/start.s
+@@ -458,6 +458,19 @@ start_cpu:
+ 	.globl EXT(start_first_cpu)
+ LEXT(start_first_cpu)
+ 
++	/*
++	 * KEBAB entry marker: MMU is still off here and x0 is the physical
++	 * boot_args pointer.  Paint the top of the framebuffer magenta before
++	 * any bootstrap page tables exist.
++	 */
++	ldr	x9, [x0, #0x28]        // Boot_Video.v_baseAddr
++	cbz	x9, 1f
++	mov	w10, #0xFFFF00FF
++	mov	x11, #0x4000
++2:	str	w10, [x9], #4
++	subs	x11, x11, #4
++	b.ne	2b
++1:
+ 	// Unlock the core for debugging
+ 	msr		OSLAR_EL1, xzr
+ 	msr		DAIFSet, #(DAIFSC_ALL)				// Disable all interrupts
