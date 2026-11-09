@@ -958,3 +958,34 @@ source markers and the panic screen are not reliable on this path yet.
 Next: get a trustworthy signal out of `PE_init_cpu` / `pe_init_fiq` (reset
 reliability is itself doubtful after early boot) or a crash PC from the 900E
 crash dump. UFS and `IOFindBSDRoot` are still downstream of this blocker.
+
+
+## 2026-11-09: QEMU entry fixture and the boot_args limitation
+
+The QEMU raw-entry fixture (`scripts/probe-stock-entry.py` plus the
+`qemu-entry` ADT) reproduces the 4 KiB kernel entry without a device. With
+the QEMU monitor (`info registers` and `x/16gx`) the following was observed:
+
+- `_start` and `start_first_cpu` are reached with MMU off and SP=0.
+- `_arm_init` is reached with `SP=0xfffffff007ba8000`, which is exactly
+  `_intstack_top`; the stack pointer itself is valid.
+- The `boot_args` KVA the kernel receives (`0xfffffff01417c000` in the
+  fixture) reads as all zero through the QEMU monitor. The fixture places
+  its boot arguments at `0x5ff00000`, outside the kernel's bootstrap
+  window, so this is a fixture limitation, not proof of a kernel bug.
+- A clean 4 KiB kernel still faults at `0xfffffff007b933b8` in
+  `__BOOTDATA`; a kernel with the SP-print probe faults earlier because the
+  probe writes the KVA stack before the MMU is on. That probe was removed
+  from the diagnosis.
+- The QEMU `gdb-stop.py` register packet is not reliable on this kernel
+  (`SCTLR_EL1` and `x1` both read `0x3454593d`); the QEMU monitor is the
+  trustworthy source.
+
+The framework was synced to `95ad781`, which adds the concurrent UFS path
+documentation, RamBlock/AdrenoMetal pins and documentation cleanups. Those
+storage changes are downstream of the early-kernel blocker and are not used
+yet.
+
+Next: use the full QEMU device build (B) once the Linux toolchain is
+installed, or fix the raw fixture's boot_args window. The device is not
+flashed for these tests.
