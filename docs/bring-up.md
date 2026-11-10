@@ -928,90 +928,64 @@ next successful kernel.
 >>>>>>> Stashed changes
 
 
-## 2026-11-07: KEBAB machine config, binary GIC and the BSD marker wall
+## 2026-11-08: early boot bisection
 
-- The KEBAB machine config (`10063-kebab-machine-config.patch`) now builds:
-  `MASTER.arm64.kebab`, `KEBAB.h`, `MakeInc.def`, `board_config.h`,
-  `proc_reg.h`, the source asm/pmap options and `pmap_pending_preemption`.
-- With the source-GIC patch removed and the binary GIC stub added, the kernel
-  reaches `bsd_init` (band 14). The source-GIC build still stops before
-  `pe_init_fiq` with 900e, so the machine config is not the blocker there.
-- `native-4k-user-abi.patch` is now in the series; it did not change the
-  `bsd_init` stop.
-- Binary probe stubs placed inside `bsd_init` still stop the boot early
-  (bands 1-3). Instead the GIC stub publishes the mapped framebuffer VA and
-  bytes-per-band into `_kebab_fb_va`/`_kebab_fb_band`, and
-  `10063-kebab-bsd-markers.patch` paints bands directly from `bsd_init`.
-- Markers observed: start (white) and after `throttle_init` (red). Skipping
-  the blocking `printf(copyright)` moved the stop past printf; the next marker
-  is placed just before `kauth_init` and is pending a hardware test.
-- Branches: `kebab-cfg` (source GIC + markers), `kebab-cfg-bingic`
-  (binary GIC + 4K runtime policy + markers), `no-early`, `no-srcgic`.
+The framebuffer bands at the top of the screen are painted by DarwinBoot, not
+by the kernel. A kernel-entry marker was added in `start_first_cpu` (MMU off,
+physical `boot_args`, paint magenta at the top of the frame buffer) to prove
+that the kernel entry really runs. With that marker and the entry-probe stage
+bars, the cold-boot path was bisected with PSCI `SYSTEM_RESET` at successive
+points:
 
+- kernel entry, stage 1 and stage 2 (before the MMU is enabled): reached
+- MMU enabled: reached (stage 3 reset fired)
+- `arm_init` entry: reached
+- `PE_init_platform` returned: reached
+- `SecureDTInit` returned: reached
+- `pe_identify_machine` returned: reached
+- just before `pe_init_debug`: reached
+- `PE_init_cpu` returned: not reached
 
-## 2026-11-07: docs study - the stop is the documented GIC/timer cycle
+`PE_init_cpu` is `pe_init_fiq()` in this tree (`pexpert/arm/hwtrace/hwtrace.c`).
+Skipping `pe_init_fiq()` for KEBAB and adding a hard-coded GIC fallback for a
+missing `/arm-io/gic` node did not change the visible result; the device still
+ends in the Qualcomm 900E crash-dump port rather than a panic screen.
 
-The upstream kebab device record (`docs/devices/kebab-stevedang67889.md`) and
-the current `docs/` tree document the same stop we are measuring:
+The earlier claims that the framebuffer `bsd_init` markers proved `bsd_init`
+or `IOFindBSDRoot` are withdrawn: those bands are DarwinBoot colours. The
+source markers and the panic screen are not reliable on this path yet.
 
-- `bsd_init` reaches `throttle_init`; `thread_call_allocate` blocks in
-  `kalloc_type_impl_internal`/`zalloc_ext`.
-- The first `printf` blocks because no console exists; skipping it moves the
-  stop to `kauth_init`, which also blocks in an allocation.
-- With no interrupt controller and no timer, every wait that wants to sleep
-  never returns; with IRQs unmasked the first IRQ stops the boot.
-- The documented next route is a real GICv3 plus arch-timer driver (the generic
-  `gic_v3_irq.c` path reading `/arm-io/gic`, or `ArmCpu::prepareGic` before
-  IOKit matching), then unmask IRQs and confirm the timer heartbeat.
-
-So the marker work has identified the stage, but the fix is the interrupt
-controller/timer, not another marker. The 4 KiB page-table reference also
-confirms that the KEBAB machine config must keep the 4 KiB runtime policy
-(`native-4k-user-abi`) and the bootstrap-table budget.
+Next: get a trustworthy signal out of `PE_init_cpu` / `pe_init_fiq` (reset
+reliability is itself doubtful after early boot) or a crash PC from the 900E
+crash dump. UFS and `IOFindBSDRoot` are still downstream of this blocker.
 
 
-## 2026-11-07: IRQs at bsd_init, kauth cleared, setconf reached
+## 2026-11-09: QEMU entry fixture and the boot_args limitation
 
-The binary GIC stub configures the timer PPI but the bring-up image kept IRQs
-masked, so the first allocations in `bsd_init` blocked in
-`kalloc_type_impl_internal`/`zalloc_ext` and `kauth_init` never returned.
+The QEMU raw-entry fixture (`scripts/probe-stock-entry.py` plus the
+`qemu-entry` ADT) reproduces the 4 KiB kernel entry without a device. With
+the QEMU monitor (`info registers` and `x/16gx`) the following was observed:
 
-The kernel is now built with `ml_set_interrupts_enabled(TRUE)` at the top of
-`bsd_init`, after the GIC stub has run:
+- `_start` and `start_first_cpu` are reached with MMU off and SP=0.
+- `_arm_init` is reached with `SP=0xfffffff007ba8000`, which is exactly
+  `_intstack_top`; the stack pointer itself is valid.
+- The `boot_args` KVA the kernel receives (`0xfffffff01417c000` in the
+  fixture) reads as all zero through the QEMU monitor. The fixture places
+  its boot arguments at `0x5ff00000`, outside the kernel's bootstrap
+  window, so this is a fixture limitation, not proof of a kernel bug.
+- A clean 4 KiB kernel still faults at `0xfffffff007b933b8` in
+  `__BOOTDATA`; a kernel with the SP-print probe faults earlier because the
+  probe writes the KVA stack before the MMU is on. That probe was removed
+  from the diagnosis.
+- The QEMU `gdb-stop.py` register packet is not reliable on this kernel
+  (`SCTLR_EL1` and `x1` both read `0x3454593d`); the QEMU monitor is the
+  trustworthy source.
 
-- the `kauth_init`, `proc_ro_alloc` and `setconf` markers all paint
-- the GIC timer heartbeat on the last band alternates red/green, so timer
-  interrupts are delivered
-- the BSD markers 14-19 are visible on the panel
+The framework was synced to `95ad781`, which adds the concurrent UFS path
+documentation, RamBlock/AdrenoMetal pins and documentation cleanups. Those
+storage changes are downstream of the early-kernel blocker and are not used
+yet.
 
-The next question is the root handoff: whether `kebab_ufs_rootdev` returns a
-valid device and whether `vfs_mountroot` proceeds. The root probes at bands
-6/7 were not clearly visible against the marker layout.
-
-The unconditional early-root experiment (`kebab_ufs_rootdev` called before the
-IOBSD wait) is in `10063-kebab-ufs-early-root.patch`; the boot arg conditional
-version is the safer final form once the call path is confirmed.
-
-
-## 2026-11-08: IRQs, markers and the observation wall
-
-- Enabling IRQs at the top of `bsd_init`, after the binary GIC/timer stub, made
-  the timer heartbeat run. The `kauth_init` allocation stall no longer appears
-  when the heartbeat is present.
-- The source framebuffer markers (GIC stage bands, BSD stage bands, UFS stage
-  bands) do not give a reliable stage readback. The same white band 0 is seen
-  for different kernels, and the GIC stub paints its own progress bands.
-- A full Mu-Silicium checkout was restored and its firmware built, but the new
-  boot image stops at the boot logo or a black screen; the old firmware plus a
-  repacked payload remains the only booting path.
-- A panic test (`panic("KEBAB BOOT TEST")`) at the top of
-  `kernel_bootstrap_thread` was added to test whether the panic screen renders;
-  the panic-screen payload patch is applied, but the screen has not produced
-  text so far.
-- The UFS driver now allocates its DMA pool with 16 KiB alignment and checks
-  16 KiB physical contiguity on the 4 KiB kernel, matching GFander's 16 KiB
-  driver assumption. The UFS stage colour still stays at the entry white.
-- UART was declined; without UART, panic screen or storage-backed logs, further
-  UFS init changes are blind.
-- Branches: `kebab-cfg` (source GIC), `kebab-cfg-bingic` (binary GIC, 4K policy,
-  16 KiB DMA), `no-early`, `no-srcgic`.
+Next: use the full QEMU device build (B) once the Linux toolchain is
+installed, or fix the raw fixture's boot_args window. The device is not
+flashed for these tests.
