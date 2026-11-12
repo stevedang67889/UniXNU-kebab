@@ -989,3 +989,26 @@ yet.
 Next: use the full QEMU device build (B) once the Linux toolchain is
 installed, or fix the raw fixture's boot_args window. The device is not
 flashed for these tests.
+
+
+## 2026-11-12: QEMU full-device boot
+
+The full QEMU device path (`UniXNU-qemu`, `qemu_defconfig`) was built and
+booted. After installing the Linux toolchain, building the archive set
+(ArmDTPlatform, ArmCpu, NativeAES, pthread, mockfs, link stubs, PMGR,
+corecrypto) and using the AAVMF firmware and a 1 GiB guest, the run reached:
+
+```text
+bsd_autoconf: calling kminit
+apfs_module_start: ... com.apple.filesystems.apfs, v2236.140.6
+Waiting on <dict ... IOProviderClass IOMedia ... UUID 04769D26-...>
+```
+
+So the 4 KiB kernel, prelink, IOKit, APFS and bsd_init all work under QEMU;
+the run stops at the expected root IOMedia wait because this configuration
+has no OS root image. The earlier KEBAB 900E is therefore not a 4 KiB kernel
+or UFS defect: it is specific to the board handoff (boot_args/DT/firmware),
+which is where the next device work belongs.
+
+QEMU was run with 1 GiB (`dram_size`/`owned_memory_size` reduced for the
+WSL host) and AAVMF instead of the macOS EDK2 path.
