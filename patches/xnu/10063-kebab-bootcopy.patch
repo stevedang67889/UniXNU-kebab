@@ -1,0 +1,43 @@
+diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
+index 8fe43b6..11181be 100644
+--- a/osfmk/arm/arm_init.c
++++ b/osfmk/arm/arm_init.c
+@@ -343,6 +343,8 @@ arm_setup_pre_sign(void)
+ 
+ __startup_func
+ void
++char kebab_boot_args_copy[0x4000] __attribute__((aligned(0x4000)));
++
+ arm_init(
+ 	boot_args       *args)
+ {
+diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
+index d4909c7..819720b 100644
+--- a/osfmk/arm64/start.s
++++ b/osfmk/arm64/start.s
+@@ -475,6 +475,25 @@ LEXT(start_first_cpu)
+ 	ldr		x22, [x20, BA_VIRT_BASE]			// Get the kernel virt base
+ 	ldr		x23, [x20, BA_PHYS_BASE]			// Get the kernel phys base
+ 	ldr		x24, [x20, BA_MEM_SIZE]				// Get the physical memory size
++	/*
++	 * KEBAB: copy boot_args into the kernel window before the MMU is on.
++	 * The old firmware may place them outside the bootstrap mapping.
++	 */
++	adrp	x5, EXT(kebab_boot_args_copy)@page
++	add	x5, x5, EXT(kebab_boot_args_copy)@pageoff
++	add	x5, x5, x22
++	sub	x5, x5, x23
++	sub	x5, x5, x22
++	add	x5, x5, x23
++	mov	x6, x5
++	mov	x2, x20
++	mov	x3, #0x4000
++1:	ldrb	w4, [x2], #1
++	strb	w4, [x5], #1
++	subs	x3, x3, #1
++	b.ne	1b
++	mov	x20, x6
++
+ 	adrp	x25, EXT(bootstrap_pagetables)@page	// Get the start of the page tables
+ 	ldr		x26, [x20, BA_BOOT_FLAGS]			// Get the kernel boot flags
+ 
