@@ -1,18 +1,18 @@
 diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
-index 8fe43b6..11181be 100644
+index 8fe43b6..d675b88 100644
 --- a/osfmk/arm/arm_init.c
 +++ b/osfmk/arm/arm_init.c
 @@ -343,6 +343,8 @@ arm_setup_pre_sign(void)
  
  __startup_func
  void
-+char kebab_boot_args_copy[0x4000] __attribute__((aligned(0x4000)));
++char kebab_boot_args_copy[0x1000] __attribute__((aligned(0x1000)));
 +
  arm_init(
  	boot_args       *args)
  {
 diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
-index d4909c7..819720b 100644
+index d4909c7..aa3e86d 100644
 --- a/osfmk/arm64/start.s
 +++ b/osfmk/arm64/start.s
 @@ -475,6 +475,25 @@ LEXT(start_first_cpu)
@@ -31,7 +31,7 @@ index d4909c7..819720b 100644
 +	add	x5, x5, x23
 +	mov	x6, x5
 +	mov	x2, x20
-+	mov	x3, #0x4000
++	mov	x3, #0x1000
 +1:	ldrb	w4, [x2], #1
 +	strb	w4, [x5], #1
 +	subs	x3, x3, #1
@@ -41,3 +41,15 @@ index d4909c7..819720b 100644
  	adrp	x25, EXT(bootstrap_pagetables)@page	// Get the start of the page tables
  	ldr		x26, [x20, BA_BOOT_FLAGS]			// Get the kernel boot flags
  
+@@ -699,9 +718,9 @@ common_start:
+ 	// Setup timer interrupt routing; must be done before MMU is enabled
+ 	mrs		x15, MPIDR_EL1						// Load MPIDR to get CPU number
+ 	and		x15, x15, #0xFF						// CPU number is in MPIDR Affinity Level 0
+-	mov		x0, #0x4000
++	mov		x0, #0x1000
+ 	lsl		x0, x0, #16
+-	add		x0, x0, #0x0040						// x0: 0x4000004X Core Timers interrupt control
++	add		x0, x0, #0x0040						// x0: 0x1000004X Core Timers interrupt control
+ 	add		x0, x0, x15, lsl #2
+ 	mov		w1, #0xF0 						// x1: 0xF0 	  Route to Core FIQs
+ 	str		w1, [x0]
